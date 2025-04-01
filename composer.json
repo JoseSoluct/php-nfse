@@ -1,5 +1,5 @@
 {
-    "name": "jose-soluct/nfse",
+    "name": "jose-soluct/php-nfse",
     "type": "library",
     "description": "Pacote para emissão de NFSe",
     "keywords": ["nfse", "sped", "nfephp"],
