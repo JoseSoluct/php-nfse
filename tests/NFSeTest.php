@@ -2,9 +2,8 @@
 
 namespace NFePHP\NFSe\Tests;
 
-use NFePHP\NFSe\NFSe;
-use NFePHP\NFSe\NFSeStatic;
 use NFePHP\Common\Certificate;
+use NFePHP\NFSe\NFSe;
 
 class NFSeTest extends NFSeTestCase
 {
@@ -14,9 +13,9 @@ class NFSeTest extends NFSeTestCase
             $this->configJson,
             Certificate::readPfx($this->contentpfx, $this->passwordpfx)
         );
-        $this->assertInstanceOf('NFePHP\NFSe\Counties\M3550308\Tools', $nfse->tools);
-        $this->assertInstanceOf('NFePHP\NFSe\Counties\M3550308\Rps', $nfse->rps);
-        $this->assertInstanceOf('NFePHP\NFSe\Counties\M3550308\Convert', $nfse->convert);
-        $this->assertInstanceOf('NFePHP\NFSe\Counties\M3550308\Response', $nfse->response);
+        $this->assertInstanceOf('NFePHP\NFSe\Counties\M4320909\Tools', $nfse->tools);
+        $this->assertInstanceOf('NFePHP\NFSe\Counties\M4320909\Rps', $nfse->rps);
+        $this->assertInstanceOf('NFePHP\NFSe\Counties\M4320909\Convert', $nfse->convert);
+        $this->assertInstanceOf('NFePHP\NFSe\Counties\M4320909\Response', $nfse->response);
     }
 }

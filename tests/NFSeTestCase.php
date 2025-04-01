@@ -15,15 +15,15 @@ class NFSeTestCase extends TestCase
     {
         $this->fixturesPath = dirname(__FILE__) . '/fixtures/';
         $config = [
-            "atualizacao" => "2016-08-03 18:01:21",
+            "atualizacao" => date("Y-m-d H:i:s"),
             "tpAmb" => 2,
             "versao" => 1,
-            "razaosocial" => "Sua empresa ltda",
-            "cnpj" => "99999090910270",
+            "razaosocial" => "PRIORIZA SISTEMAS LTDA",
+            "cnpj" => "48704149000188",
             "cpf" => "",
-            "im" => "39111111",
-            "cmun" => "3550308",
-            "siglaUF" => "SP",
+            "im" => "8963",
+            "cmun" => "4320909",
+            "siglaUF" => "RS",
             "pathNFSeFiles" => "/tmp/nfse",
             "aProxyConf" => [
                 "proxyIp" => "",
