@@ -5,7 +5,7 @@
     "keywords": ["nfse", "sped", "nfephp"],
     "license": ["Apache-2.0"],
     "require": {
-        "php" : "~8",
+        "php": "^8.2",
         "nfephp-org/sped-common" : "^v5",
         "respect/validation": "^2"
     },

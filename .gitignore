@@ -1,3 +1,4 @@
 /nbproject/private/
 /vendor
 /tests/fixtures/certs
+.env

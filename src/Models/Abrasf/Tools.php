@@ -16,9 +16,10 @@ namespace NFePHP\NFSe\Models\Abrasf;
  * @link      http://github.com/nfephp-org/sped-nfse for the canonical source repository
  */
 
-use NFePHP\NFSe\Common\Tools as ToolsBase;
+use DOMDocument;
+use LogicException;
 use NFePHP\Common\Soap\SoapCurl as SoapCurl;
-use NFePHP\NFSe\Models\Abrasf\Factories;
+use NFePHP\NFSe\Common\Tools as ToolsBase;
 
 
 class Tools extends ToolsBase
@@ -94,16 +95,16 @@ class Tools extends ToolsBase
     {
         $this->xmlRequest = $message;
         
-        //Abrasf possui apenas uma URL
-        if (!$url) {
-            $url = $this->url[$this->config->tpAmb];
-        }
 
+        if (!$url) {
+            $url = $this->url[$this->config->tpAmb][$this->method];
+        }
+        die(var_dump($url));
         if (!is_object($this->soap)) {
             $this->soap = new SoapCurl($this->certificate);
         }
         //formata o xml da mensagem para o padão esperado pelo webservice
-        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $dom = new DOMDocument('1.0', 'UTF-8');
         $dom->preserveWhiteSpace = false;
         $dom->formatOutput = false;
         $dom->loadXML($message);
@@ -167,7 +168,7 @@ class Tools extends ToolsBase
                     . "</e:{$this->method}>";
                 break;
             default:
-                throw new \LogicException('Versão não suportada');
+                throw new LogicException('Versão não suportada');
         }
         return $request;
     }

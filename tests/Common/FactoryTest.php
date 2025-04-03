@@ -2,11 +2,11 @@
 
 namespace NFePHP\NFSe\Tests\Common;
 
-use NFePHP\NFSe\Tests\NFSeTestCase;
 use NFePHP\Common\Certificate;
 use NFePHP\NFSe\Common\Factory;
+use PHPUnit\Framework\TestCase;
 
-class FactoryTest  extends NFSeTestCase
+class FactoryTest extends TestCase
 {
     public $factory;
     
@@ -18,7 +18,7 @@ class FactoryTest  extends NFSeTestCase
     
     public function testPathSchemes()
     {
-        $path = $this->factory->pathSchemes.DIRECTORY_SEPARATOR.'Prodam';
+        $path = $this->factory->pathSchemes . DIRECTORY_SEPARATOR . 'Tecnos';
         $condition = is_dir($path);
         $this->assertTrue($condition);
     }
