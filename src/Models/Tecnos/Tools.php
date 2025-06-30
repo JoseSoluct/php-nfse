@@ -43,22 +43,22 @@ class Tools extends ToolsBase
      */
     public function recepcionarLoteRpsSincrono($lote, $rpss)
     {
-        $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\RecepcionarLoteRps";
+        $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\RecepcionarLoteRpsSincrono";
         $fact = new $class($this->certificate);
 
         return $this->recepcionarLoteRpsSincronoCommon($fact, $lote, $rpss);
     }
 
     /**
-     * @param Factories\RecepcionarLoteRps $fact
+     * @param Factories\RecepcionarLoteRpsSincrono $fact
      * @param $lote
      * @param $rpss
      * @param string $url
      * @return string
      */
-    protected function recepcionarLoteRpsSincronoCommon(Factories\RecepcionarLoteRps $fact, $lote, $rpss, $url = '')
+    protected function recepcionarLoteRpsSincronoCommon($fact, $lote, $rpss, $url = '')
     {
-        $this->method = 'EnvioLoteRPSSincrono';
+        $this->method = 'EnviarLoteRpsSincronoEnvio';
         $fact->setXmlns($this->xmlns);
         $fact->setSchemeFolder($this->schemeFolder);
         $fact->setCodMun($this->config->cmun);
@@ -100,6 +100,40 @@ class Tools extends ToolsBase
         $this->setXmlns($this->xmlns);
         $message = $fact->render($this->remetenteCNPJCPF, $this->remetenteRazao, $this->remetenteIM);
         $this->soapAction = 'http://tempuri.org/mConsultaSequenciaLoteNotaRPS';
+        return $this->sendRequest($url, $message);
+    }
+
+    /**
+     * @param $numero
+     * @param $serie
+     * @param $tipo
+     * @param string $url
+     * @return string
+     */
+    public function consultarNfsePorRps($numero, $serie, $tipo)
+    {
+        $class = "NFePHP\\NFSe\\Models\\Abrasf\\Factories\\v{$this->versao}\\ConsultarNfsePorRps";
+        $fact = new $class($this->certificate);
+        return $this->consultarNfsePorRpsCommon($fact, $numero, $serie, $tipo);
+    }
+
+    /**
+     * @param $fact
+     * @param $numero
+     * @param $serie
+     * @param $tipo
+     * @param string $url
+     * @return string
+     */
+    protected function consultarNfsePorRpsCommon($fact, $numero, $serie, $tipo, $url = '')
+    {
+        $this->method = 'ConsultarNfsePorRps';
+        $fact->setXmlns($this->xmlns);
+        $fact->setSchemeFolder($this->schemeFolder);
+        $fact->setCodMun($this->config->cmun);
+        $fact->setSignAlgorithm($this->algorithm);
+        $fact->setTimezone($this->timezone);
+        $message = $fact->render($this->versao, $this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteIM, $numero, $serie, $tipo);
         return $this->sendRequest($url, $message);
     }
 

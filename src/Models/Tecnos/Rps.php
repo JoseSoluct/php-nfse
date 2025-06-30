@@ -293,8 +293,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser um inteiro positivo apenas. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->positive()->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->positive()->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infNumero = $value;
     }
@@ -315,7 +315,7 @@ class Rps extends RpsBase
 
         $value = trim($value);
         if (!Validator::stringType()->length(1, 5)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+            throw new InvalidArgumentException($msg);
         }
         $this->infSerie = $value;
     }
@@ -334,8 +334,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser um valor inteiro entre 1 e 3. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->between(1, 3)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->between(1, 3)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infTipo = $value;
     }
@@ -379,8 +379,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve estar entre 1 e 6. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->between(1, 6)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->between(1, 6)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infNaturezaOperacao = $value;
     }
@@ -399,8 +399,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser 1 ou 2. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->between(1, 2)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->between(1, 2)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infOptanteSimplesNacional = $value;
     }
@@ -419,8 +419,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser 1 ou 2. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->between(1, 2)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->between(1, 2)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infIncentivadorCultural = $value;
     }
@@ -439,8 +439,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser 1 ou 2. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->between(1, 2)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->between(1, 2)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infStatus = $value;
     }
@@ -459,8 +459,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve estar entre 1 e 4. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->between(1, 4)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->between(1, 4)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infRegimeEspecialTributacao = $value;
     }
@@ -479,8 +479,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorServicos = round($value, 2);
     }
@@ -499,8 +499,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infOutrasRetencoes = round($value, 2);
     }
@@ -519,8 +519,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorPis = round($value, 2);
     }
@@ -539,8 +539,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorCofins = round($value, 2);
     }
@@ -559,8 +559,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorInss = round($value, 2);
     }
@@ -579,8 +579,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorIr = round($value, 2);
     }
@@ -599,8 +599,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorCsll = round($value, 2);
     }
@@ -619,8 +619,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser 1 ou 2. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->between(1, 2)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->between(1, 2)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infIssRetido = $value;
     }
@@ -639,8 +639,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorIssRetido = round($value, 2);
     }
@@ -659,8 +659,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorIss = round($value, 2);
     }
@@ -680,8 +680,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infBaseCalculo = round($value, 2);
     }
@@ -700,8 +700,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infAliquota = round($value, 4);
     }
@@ -720,8 +720,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorDeducoes = round($value, 2);
     }
@@ -743,8 +743,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infValorLiquidoNfse = round($value, 2);
     }
@@ -763,8 +763,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infDescontoIncondicionado = round($value, 2);
     }
@@ -783,8 +783,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infDescontoCondicionado = round($value, 2);
     }
@@ -805,7 +805,7 @@ class Rps extends RpsBase
 
         $value = trim($value);
         if (!Validator::stringType()->length(1, 5)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+            throw new InvalidArgumentException($msg);
         }
         $this->infItemListaServico = $value;
     }
@@ -824,8 +824,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' é obrigatório e precisa ser um valor inteiro. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infCodigoCnae = $value;
     }
@@ -846,7 +846,7 @@ class Rps extends RpsBase
 
         $value = trim($value);
         if (!Validator::stringType()->length(1, 20)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+            throw new InvalidArgumentException($msg);
         }
         $this->infCodigoTributacaoMunicipio = $value;
     }
@@ -867,7 +867,7 @@ class Rps extends RpsBase
 
         $value = trim($value);
         if (!Validator::stringType()->length(1, 2000)->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+            throw new InvalidArgumentException($msg);
         }
         $this->infDiscriminacao = $value;
     }
@@ -896,8 +896,8 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve ser inteiro, referente ao código IBGE. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->validate($value)) {
-            throw new \InvalidArgumentException($msg);
+        if (!Validator::numericVal()->intVal()->validate($value)) {
+            throw new InvalidArgumentException($msg);
         }
         $this->infMunicipioPrestacaoServico = $value;
     }
