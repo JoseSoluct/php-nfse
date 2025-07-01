@@ -4,9 +4,12 @@ namespace NFePHP\NFSe\Models\Tecnos\Factories\v100;
 
 use NFePHP\Common\DOMImproved as Dom;
 use NFePHP\NFSe\Models\Tecnos\Factories\RecepcionarLoteRps as RecepcionarLoteRpsBase;
+use NFePHP\NFSe\Models\Tecnos\Factories\Signer;
 
 class RecepcionarLoteRps extends RecepcionarLoteRpsBase
 {
+    protected $xmlns = "http://www.abrasf.org.br/nfse.xsd";
+
     /**
      * Método usado para gerar o XML do Soap Request
      * @param $versao
@@ -24,7 +27,8 @@ class RecepcionarLoteRps extends RecepcionarLoteRpsBase
         $inscricaoMunicipal,
         $lote,
         $rpss
-    ) {
+    )
+    {
         $method = 'EnviarLoteRpsSincrono';
         $xsd = "EnviarLoteRpsSincronoEnvio";
         $qtdRps = count($rpss);
@@ -107,9 +111,18 @@ class RecepcionarLoteRps extends RecepcionarLoteRpsBase
 
         //Parse para XML
         $xml = str_replace('<?xml version="1.0" encoding="utf-8"?>', '', $dom->saveXML());
-        $body = $this->clear($xml);
-//        echo $body;die;
-//        $this->validar($versao, $body, $this->schemeFolder, $xsd, '');
+
+        $body = Signer::sign(
+            $this->certificate,
+            $xml,
+            'LoteRps',
+            'Id',
+            $this->algorithm,
+            [false, false, null, null],
+            '',
+            true
+        );
+        $body = $this->clear($body);
 
         return $body;
     }

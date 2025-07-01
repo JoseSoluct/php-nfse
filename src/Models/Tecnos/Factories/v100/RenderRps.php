@@ -19,7 +19,6 @@ namespace NFePHP\NFSe\Models\Tecnos\Factories\v100;
 use DateTimeZone;
 use NFePHP\Common\Certificate;
 use NFePHP\NFSe\Models\Tecnos\Factories\Signer;
-use NFePHP\NFSe\Models\Tecnos\Factories\SignerRps;
 use NFePHP\NFSe\Models\Tecnos\RenderRps as RenderRPSBase;
 use NFePHP\NFSe\Models\Tecnos\Rps;
 
@@ -718,16 +717,6 @@ class RenderRps extends RenderRPSBase
         );
 
         self::$dom->appChild($tcdeclaracaoRPS, $infRPS, 'Adicionando tag infRPS em RPS');
-        //Gera o nó com a assinatura
-        $signatureNode = SignerRps::sign(
-            self::$certificate,
-            'InfDeclaracaoPrestacaoServico',
-            'Id',
-            self::$algorithm,
-            [false, false, null, null],
-            $dom,
-            $tcdeclaracaoRPS
-        );
         self::$dom->appChild($root, $tcdeclaracaoRPS, 'Adicionando tag infRPS em RPS');
         self::$dom->appChild($parent, $root, 'Adicionando tag RPS na ListaRps');
 
@@ -748,7 +737,6 @@ class RenderRps extends RenderRPSBase
         self::$timezone = $timezone;
 
         if (is_object($data)) {
-            //Gera a RPS
             $rootNode = self::render($data, $dom, $parent);
         }
     }

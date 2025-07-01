@@ -59,9 +59,6 @@ class Tools extends ToolsBase
     protected function recepcionarLoteRpsSincronoCommon($fact, $lote, $rpss, $url = '')
     {
         $this->method = 'EnvioLoteRPSSincrono';
-        $fact->setXmlns($this->xmlns);
-        $fact->setSchemeFolder($this->schemeFolder);
-        $fact->setCodMun($this->config->cmun);
         $fact->setSignAlgorithm($this->algorithm);
         $fact->setTimezone($this->timezone);
         $message = $fact->render(
@@ -72,10 +69,7 @@ class Tools extends ToolsBase
             $lote,
             $rpss
         );
-
-        // @header ("Content-Disposition: attachment; filename=\"NFSe_Lote.xml\"" );
-        // echo $message;
-        // exit;
+        $this->xmlns = 'http://tempuri.org/';
         return $this->sendRequest($url, $message);
     }
     /**
@@ -100,6 +94,7 @@ class Tools extends ToolsBase
         $this->setXmlns($this->xmlns);
         $message = $fact->render($this->remetenteCNPJCPF, $this->remetenteRazao, $this->remetenteIM);
         $this->soapAction = 'http://tempuri.org/mConsultaSequenciaLoteNotaRPS';
+        $this->xmlns = 'http://tempuri.org/';
         return $this->sendRequest($url, $message);
     }
 

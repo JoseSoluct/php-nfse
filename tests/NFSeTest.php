@@ -23,7 +23,7 @@ class NFSeTest extends TestCase
         $this->fixturesPath = dirname(__FILE__) . '/fixtures/';
         $config = [
             "atualizacao" => date("Y-m-d H:i:s"),
-            "tpAmb" => 1,
+            "tpAmb" => 2,
             "versao" => 1,
             "razaosocial" => "PRIORIZA SISTEMAS LTDA",
             "cnpj" => "48704149000188",
@@ -93,7 +93,7 @@ class NFSeTest extends TestCase
         $rps = new Rps();
 
         $rps->prestador($rps::CNPJ, '48704149000188', 'PRIORIZA SISTEMAS LTDA', '8963');
-        $rps->tomador($rps::CPF, '11111111111', '', '', 'JOSE ALCIDES', '54996178803', 'jose@priorizasistemas.com.br');
+        $rps->tomador($rps::CPF, '01284018008', '', '', 'JOSE ALCIDES', '54996178803', 'jose@priorizasistemas.com.br');
         $rps->tomadorEndereco(
             'Av 7 De Setembro',
             '783',
@@ -116,7 +116,7 @@ class NFSeTest extends TestCase
         $rps->codigoPais(1058); //999 em ambiente de produção
         $rps->naturezaOperacao($rps::NATUREZA_EXIGIVEL);
         $rps->codigoCnae(0);
-        $rps->itemListaServico('01.07');
+        $rps->itemListaServico('1.07');
         $rps->codigoTributacaoMunicipio('4320909');
         $rps->discriminacao('TESTE ### Valor Aproximado dos Tributos: R$ 0,17');
         $rps->regimeEspecialTributacao($rps::REGIME_NENHUM);

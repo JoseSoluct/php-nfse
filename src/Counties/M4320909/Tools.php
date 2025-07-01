@@ -31,17 +31,10 @@ class Tools extends ToolsModel
             'ConsultaNFSePorRPS' => 'http://tapejara.nfse-tecnos.com.br:9095/ConsultaNFSePorRPS.asmx',
         ],
         2 => [
-            'ConsultaLoteNotasTomadas' => 'http://homologatapejara.nfse-tecnos.com.br:9083',
-            'ConsultaSequenciaLoteNotaRPS' => 'http://homologatapejara.nfse-tecnos.com.br:9084',
-            'SubstituirNfseEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9086',
-            'EnvioLoteRPSSincrono' => 'http://homologatapejara.nfse-tecnos.com.br:9091',
-            'EnvioLoteNotasTomadas' => 'http://homologatapejara.nfse-tecnos.com.br:9092',
-            'ConsultarNfseServicoTomadoEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9093',
-            'ConsultarNfseServicoPrestadoEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9094',
-            'ConsultaNFSePorRPS' => 'http://homologatapejara.nfse-tecnos.com.br:9095',
-            'ConsultarNfseFaixaEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9096',
-            'ConsultarLoteRpsEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9097',
-            'CancelarNfseEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9098',
+            'ConsultaSequenciaLoteNotaRPS' => 'http://homologatapejara.nfse-tecnos.com.br:9084/ConsultaSequenciaLoteNotaRPS.asmx',
+            'EnvioLoteRPSSincrono' => 'http://homologatapejara.nfse-tecnos.com.br:9091/EnvioLoteRPSSincrono.asmx',
+            'ConsultaNFSePorRPS' => 'http://homologatapejara.nfse-tecnos.com.br:9095/ConsultaNFSePorRPS.asmx',
+            'CancelarNfseEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9098/CancelamentoNFSe.asmx',
         ]
     ];
 
@@ -97,6 +90,7 @@ class Tools extends ToolsModel
         $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\RecepcionarLoteRps";
         $fact = new $class($this->certificate);
         $this->soapAction = 'http://tempuri.org/mEnvioLoteRPSSincrono';
+        $this->xmlns = 'http://tempuri.org/';
         return $this->recepcionarLoteRpsSincronoCommon($fact, $lote, $rpss);
     }
 
@@ -134,7 +128,6 @@ class Tools extends ToolsModel
             "Content-Type: text/xml; charset=utf-8;",
             "SOAPAction: \"{$this->soapAction}\""
         ];
-//        echo var_dump($request);die;
         $action = '';
         return $this->soap->send(
             $url,
