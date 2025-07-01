@@ -16,6 +16,7 @@ namespace NFePHP\NFSe\Models\Tecnos\Factories\v100;
  * @link      http://github.com/nfephp-org/sped-nfse for the canonical source repository
  */
 
+use DateTimeZone;
 use NFePHP\Common\Certificate;
 use NFePHP\NFSe\Models\Tecnos\Factories\Signer;
 use NFePHP\NFSe\Models\Tecnos\Factories\SignerRps;
@@ -26,7 +27,7 @@ class RenderRps extends RenderRPSBase
 {
     public static function toXml(
         $data,
-        \DateTimeZone $timezone,
+        DateTimeZone $timezone,
         Certificate $certificate,
         $algorithm = OPENSSL_ALGO_SHA1
     ) {
@@ -71,12 +72,13 @@ class RenderRps extends RenderRPSBase
         self::$dom = $dom;
         $root = self::$dom->createElement('Rps');
 
+        $numeroFormatado = str_pad($rps->infNumero, 16, '0', STR_PAD_LEFT);
+        $tcdeclaracaoRPS = self::$dom->createElement("tcDeclaracaoPrestacaoServico");
         $infRPS = self::$dom->createElement("InfDeclaracaoPrestacaoServico");
-        $infRPS->setAttribute('Id', "infRPS{$rps->infNumero}");
+        $infRPS->setAttribute('Id', "1{$rps->infPrestador['cnpjcpf']}{$numeroFormatado}");
 
         /** RPS Filha **/
         $rpsInf = self::$dom->createElement('Rps');
-        $rpsInf->setAttribute('Id', "rpsInf{$rps->infNumero}");
 
         //Identificação RPS
         $identificacaoRps = self::$dom->createElement('IdentificacaoRps');
@@ -110,11 +112,10 @@ class RenderRps extends RenderRPSBase
         );
         self::$dom->appChild($rpsInf, $identificacaoRps, 'Adicionando tag IdentificacaoRPS');
         //FIM Identificação RPS
-
         self::$dom->addChild(
             $rpsInf,
             'DataEmissao',
-            $rps->infDataEmissao->format('Y-m-d'),
+            $rps->infDataEmissao->format('Y-m-d\TH:i:s'),
             true,
             'Data de Emissão do RPS',
             false
@@ -151,7 +152,7 @@ class RenderRps extends RenderRPSBase
             self::$dom->addChild(
                 $rpssubs,
                 'Tipo',
-                $rps->infRpsSubstituido['tipo'],
+                $rps->infRpsSubstituido['tipo'] == '' ?? 1,
                 true,
                 'tipo',
                 false
@@ -165,7 +166,7 @@ class RenderRps extends RenderRPSBase
         self::$dom->addChild(
             $infRPS,
             'Competencia',
-            $rps->infDataEmissao->format('Y-m-d'),
+            $rps->infDataEmissao->format('Y-m-d\TH:i:s'),
             true,
             'Competencia Emissão do RPS',
             false
@@ -174,8 +175,26 @@ class RenderRps extends RenderRPSBase
         /** Serviços **/
         $servico = self::$dom->createElement('Servico');
 
+        $tcDadosServico = self::$dom->createElement('tcDadosServico');
+
         //Valores
         $valores = self::$dom->createElement('Valores');
+        self::$dom->addChild(
+            $valores,
+            'BaseCalculoCRS',
+            $rps->infBaseCalculoCRS,
+            true,
+            'BaseCalculoCRS',
+            false
+        );
+        self::$dom->addChild(
+            $valores,
+            'IrrfIndenizacao',
+            $rps->infIrrfIndenizacao,
+            true,
+            'IrrfIndenizacao',
+            false
+        );
         self::$dom->addChild(
             $valores,
             'ValorServicos',
@@ -268,42 +287,41 @@ class RenderRps extends RenderRPSBase
         );
         self::$dom->addChild(
             $valores,
-            'DescontoCondicionado',
-            $rps->infDescontoCondicionado,
-            false,
-            'DescontoCondicionado',
-            false
-        );
-        self::$dom->addChild(
-            $valores,
             'DescontoIncondicionado',
             $rps->infDescontoIncondicionado,
             false,
             'DescontoIncondicionado',
             false
         );
-        self::$dom->appChild($servico, $valores, 'Adicionando tag Valores em Servico');
-        //FIM Valores
-
         self::$dom->addChild(
-            $servico,
+            $valores,
+            'DescontoCondicionado',
+            $rps->infDescontoCondicionado,
+            false,
+            'DescontoCondicionado',
+            false
+        );
+        self::$dom->appChild($tcDadosServico, $valores, 'Adicionando tag Valores em Servico');
+        self::$dom->addChild(
+            $tcDadosServico,
             'IssRetido',
             $rps->infIssRetido,
             true,
             'IssRetido',
             false
         );
-        // <======= RESPONSAVEL RETENCAO AQUI =======>
-        // self::$dom->addChild(
-        //     $servico,
-        //     'ResponsavelRetencao',
-        //     $rps->infResponsavelRetencao,
-        //     false,
-        //     'ResponsavelRetencao',
-        //     false
-        // );
         self::$dom->addChild(
-            $servico,
+            $tcDadosServico,
+            'ResponsavelRetencao',
+            $rps->infResponsavelRetencao,
+            false,
+            'ResponsavelRetencao',
+            false
+        );
+        //FIM Valores
+
+        self::$dom->addChild(
+            $tcDadosServico,
             'ItemListaServico',
             $rps->infItemListaServico,
             true,
@@ -311,7 +329,7 @@ class RenderRps extends RenderRPSBase
             false
         );
         self::$dom->addChild(
-            $servico,
+            $tcDadosServico,
             'CodigoCnae',
             $rps->infCodigoCnae,
             false,
@@ -319,7 +337,7 @@ class RenderRps extends RenderRPSBase
             false
         );
         self::$dom->addChild(
-            $servico,
+            $tcDadosServico,
             'CodigoTributacaoMunicipio',
             $rps->infCodigoTributacaoMunicipio,
             false,
@@ -327,7 +345,7 @@ class RenderRps extends RenderRPSBase
             false
         );
         self::$dom->addChild(
-            $servico,
+            $tcDadosServico,
             'Discriminacao',
             $rps->infDiscriminacao,
             true,
@@ -335,24 +353,24 @@ class RenderRps extends RenderRPSBase
             false
         );
         self::$dom->addChild(
-            $servico,
+            $tcDadosServico,
             'CodigoMunicipio',
             $rps->infMunicipioPrestacaoServico,
             true,
             'CodigoMunicipio',
             false
-        );        
-        /* self::$dom->addChild(
-             $servico,
+        );
+        self::$dom->addChild(
+            $tcDadosServico,
              'CodigoPais',
              $rps->infCodigoPais,
              false,
              'CodigoPais',
              false
-         );*/
+        );
          
         self::$dom->addChild(
-            $servico,
+            $tcDadosServico,
             'ExigibilidadeISS',
             1,
             true,
@@ -360,21 +378,22 @@ class RenderRps extends RenderRPSBase
             false
         );
         self::$dom->addChild(
-            $servico,
+            $tcDadosServico,
             'MunicipioIncidencia',
             $rps->infMunicipioPrestacaoServico,
             false,
             'MunicipioIncidencia',
             false
         );
-        // self::$dom->addChild(
-        //     $servico,
-        //     'NumeroProcesso',
-        //     $rps->infNumeroProcesso,
-        //     false,
-        //     'NumeroProcesso',
-        //     false
-        // );
+        self::$dom->addChild(
+            $tcDadosServico,
+            'NumeroProcesso',
+            '',
+            true,
+            'NumeroProcesso',
+            false
+        );
+        self::$dom->appChild($servico, $tcDadosServico, 'Adicionando tag Valores em Servico');
         self::$dom->appChild($infRPS, $servico, 'Adicionando tag Servico');
         /** FIM Serviços **/
 
@@ -406,7 +425,15 @@ class RenderRps extends RenderRPSBase
             self::$dom->appChild($prestador, $cpfCnpj, 'Adicionando tag CpfCnpj em Prestador');
         }
 
-        //Inscrição Municipal
+        self::$dom->addChild(
+            $prestador,
+            'RazaoSocial',
+            $rps->infPrestador['razaosocial'],
+            false,
+            'RazaoSocial',
+            false
+        );
+
         self::$dom->addChild(
             $prestador,
             'InscricaoMunicipal',
@@ -454,8 +481,16 @@ class RenderRps extends RenderRPSBase
                     $identificacaoTomador,
                     'InscricaoMunicipal',
                     $rps->infTomador['im'],
-                    false,
+                    true,
                     'InscricaoMunicipal',
+                    false
+                );
+                self::$dom->addChild(
+                    $identificacaoTomador,
+                    'InscricaoEstadual',
+                    $rps->infTomador['ie'],
+                    true,
+                    'InscricaoEstadual',
                     false
                 );
                 self::$dom->appChild($tomador, $identificacaoTomador,
@@ -522,6 +557,14 @@ class RenderRps extends RenderRPSBase
                     $rps->infTomadorEndereco['uf'],
                     false,
                     'Uf',
+                    false
+                );
+                self::$dom->addChild(
+                    $endereco,
+                    'CodigoPais',
+                    $rps->infTomadorEndereco['codigopais'],
+                    false,
+                    'CodigoPais',
                     false
                 );
                 self::$dom->addChild(
@@ -651,6 +694,14 @@ class RenderRps extends RenderRPSBase
         );
         self::$dom->addChild(
             $infRPS,
+            'NaturezaOperacao',
+            $rps->infNaturezaOperacao,
+            false,
+            'NaturezaOperacao',
+            false
+        );
+        self::$dom->addChild(
+            $infRPS,
             'OptanteSimplesNacional',
             $rps->infOptanteSimplesNacional,
             true,
@@ -666,7 +717,18 @@ class RenderRps extends RenderRPSBase
             false
         );
 
-        self::$dom->appChild($root, $infRPS, 'Adicionando tag infRPS em RPS');
+        self::$dom->appChild($tcdeclaracaoRPS, $infRPS, 'Adicionando tag infRPS em RPS');
+        //Gera o nó com a assinatura
+        $signatureNode = SignerRps::sign(
+            self::$certificate,
+            'InfDeclaracaoPrestacaoServico',
+            'Id',
+            self::$algorithm,
+            [false, false, null, null],
+            $dom,
+            $tcdeclaracaoRPS
+        );
+        self::$dom->appChild($root, $tcdeclaracaoRPS, 'Adicionando tag infRPS em RPS');
         self::$dom->appChild($parent, $root, 'Adicionando tag RPS na ListaRps');
 
         return $root;
@@ -674,7 +736,7 @@ class RenderRps extends RenderRPSBase
 
     public static function appendRps(
         $data,
-        \DateTimeZone $timezone,
+        DateTimeZone $timezone,
         Certificate $certificate,
         $algorithm = OPENSSL_ALGO_SHA1,
         &$dom,
@@ -689,16 +751,5 @@ class RenderRps extends RenderRPSBase
             //Gera a RPS
             $rootNode = self::render($data, $dom, $parent);
         }
-
-        //Gera o nó com a assinatura
-        $signatureNode = SignerRps::sign(
-            self::$certificate,
-            'Rps',
-            'Id',
-            self::$algorithm,
-            [false, false, null, null],
-            $dom,
-            $rootNode
-        );
     }
 }

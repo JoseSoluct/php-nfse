@@ -77,7 +77,7 @@ class NFSeTest extends TestCase
             $this->configJson,
             Certificate::readPfx($this->contentpfx, $this->passwordpfx)
         );
-        $response = $nfse->tools->consultarNfsePorRps();
+        $response = $nfse->tools->consultarNfsePorRps(1, 'UNICA', 1);
         $this->assertIsString($response, 'O response não é uma string.');
         $this->assertStringContainsString('<?xml', $response, 'O response não contém XML válido.');
     }
@@ -91,8 +91,8 @@ class NFSeTest extends TestCase
 
         $rps = new Rps();
 
-        $rps->prestador($rps::CNPJ, '48704149000188', '8963');
-        $rps->tomador($rps::CPF, '11111111111', '', 'JOSÉ ALCIDES', '54996178803', 'jose@priorizasistemas.com.br');
+        $rps->prestador($rps::CNPJ, '48704149000188', 'PRIORIZA SISTEMAS LTDA', '8963');
+        $rps->tomador($rps::CPF, '11111111111', '', '', 'JOSE ALCIDES', '54996178803', 'jose@priorizasistemas.com.br');
         $rps->tomadorEndereco(
             'Av 7 De Setembro',
             '783',
@@ -100,6 +100,7 @@ class NFSeTest extends TestCase
             'Centro',
             '4320909',
             'RS',
+            '1058',
             '99950000'
         );
 
@@ -110,22 +111,28 @@ class NFSeTest extends TestCase
 
         $timezone = new DateTimeZone('America/Sao_Paulo');
         $rps->dataEmissao(new DateTime("now", $timezone));
-        $rps->municipioPrestacaoServico('999'); //999 em ambiente de produção
-        $rps->naturezaOperacao($rps::NATUREZA_INTERNA);
-        $rps->itemListaServico('0107');
+        $rps->municipioPrestacaoServico('4305108');
+        $rps->codigoPais(1058); //999 em ambiente de produção
+        $rps->naturezaOperacao($rps::NATUREZA_EXIGIVEL);
+        $rps->codigoCnae(0);
+        $rps->itemListaServico('01.07');
         $rps->codigoTributacaoMunicipio('4320909');
         $rps->discriminacao('TESTE ### Valor Aproximado dos Tributos: R$ 0,17');
-        $rps->regimeEspecialTributacao($rps::REGIME_MICROEMPRESA);
-        $rps->optanteSimplesNacional($rps::NAO);
+        $rps->regimeEspecialTributacao($rps::REGIME_NENHUM);
+        $rps->optanteSimplesNacional($rps::SIM);
         $rps->incentivadorCultural($rps::NAO);
         $rps->issRetido($rps::NAO);
+        $rps->responsavelRetencao($rps::TOMADOR);
         $rps->aliquota(3.0000);
+        $rps->baseCalculoCRS(0);
+        $rps->irrfIndenizacao(0);
         $rps->valorServicos(1);
         $rps->valorDeducoes(0.00);
         $rps->outrasRetencoes(0.00);
         $rps->descontoCondicionado(0.00);
         $rps->descontoIncondicionado(0.00);
         $rps->baseCalculo(1);
+        $rps->numeroProcesso('48704149000188000000001');
 
         $rps->valorIss(0.03);
         $rps->valorPis(0.00);
@@ -141,7 +148,8 @@ class NFSeTest extends TestCase
 
         //envio do RPS
         $response = $nfse->tools->recepcionarLoteRpsSincrono(1, [$rps]);
-        Log::info($response);
+        echo $response;
+        die;
         $this->assertIsString($response, 'O response não é uma string.');
         $this->assertStringContainsString('<?xml', $response, 'O response não contém XML válido.');
     }

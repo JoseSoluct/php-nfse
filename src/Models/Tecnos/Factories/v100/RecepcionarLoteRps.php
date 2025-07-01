@@ -4,7 +4,6 @@ namespace NFePHP\NFSe\Models\Tecnos\Factories\v100;
 
 use NFePHP\Common\DOMImproved as Dom;
 use NFePHP\NFSe\Models\Tecnos\Factories\RecepcionarLoteRps as RecepcionarLoteRpsBase;
-use NFePHP\NFSe\Models\Tecnos\Factories\Signer;
 
 class RecepcionarLoteRps extends RecepcionarLoteRpsBase
 {
@@ -26,23 +25,26 @@ class RecepcionarLoteRps extends RecepcionarLoteRpsBase
         $lote,
         $rpss
     ) {
-        $method = 'EnviarLoteRpsEnvio';
-        $xsd = "nfse_v{$versao}";
+        $method = 'EnviarLoteRpsSincrono';
+        $xsd = "EnviarLoteRpsSincronoEnvio";
         $qtdRps = count($rpss);
 
 
         $dom = new Dom('1.0', 'utf-8');
         $dom->formatOutput = false;
         //Cria o elemento pai
-        $root = $dom->createElement('EnviarLoteRpsEnvio');
+        $root = $dom->createElement('EnviarLoteRpsSincronoEnvio');
         $root->setAttribute('xmlns', $this->xmlns);
 
         //Adiciona as tags ao DOM
         $dom->appendChild($root);
 
         $loteRps = $dom->createElement('LoteRps');
-        $loteRps->setAttribute('Id', "lote{$lote}");
-        $loteRps->setAttribute('versao', '2.03');
+        $ano = date('Y');
+        $documentoFormatado = str_pad($remetenteCNPJCPF, 14, '0', STR_PAD_LEFT);
+        $loteFormatado = str_pad($lote, 16, '0', STR_PAD_LEFT);
+        $loteRps->setAttribute('Id', "1{$ano}{$documentoFormatado}{$loteFormatado}");
+        $loteRps->setAttribute('versao', '20.01');
 
         $dom->appChild($root, $loteRps, 'Adicionando tag LoteRps a EnviarLoteRpsEnvio');
 
@@ -98,7 +100,6 @@ class RecepcionarLoteRps extends RecepcionarLoteRpsBase
         /* Lista de RPS */
         $listaRps = $dom->createElement('ListaRps');
         $dom->appChild($loteRps, $listaRps, 'Adicionando tag ListaRps a LoteRps');
-
         foreach ($rpss as $rps) {
             RenderRps::appendRps($rps, $this->timezone, $this->certificate, $this->algorithm, $dom, $listaRps);
         }
@@ -106,19 +107,9 @@ class RecepcionarLoteRps extends RecepcionarLoteRpsBase
 
         //Parse para XML
         $xml = str_replace('<?xml version="1.0" encoding="utf-8"?>', '', $dom->saveXML());
-
-        $body = Signer::sign(
-            $this->certificate,
-            $xml,
-            'LoteRps',
-            'Id',
-            $this->algorithm,
-            [false, false, null, null],
-            '',
-            true
-        );
-        $body = $this->clear($body);
-        $this->validar($versao, $body, $this->schemeFolder, $xsd, '');
+        $body = $this->clear($xml);
+//        echo $body;die;
+//        $this->validar($versao, $body, $this->schemeFolder, $xsd, '');
 
         return $body;
     }

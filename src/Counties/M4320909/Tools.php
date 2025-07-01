@@ -34,21 +34,16 @@ class Tools extends ToolsModel
             'ConsultaLoteNotasTomadas' => 'http://homologatapejara.nfse-tecnos.com.br:9083',
             'ConsultaSequenciaLoteNotaRPS' => 'http://homologatapejara.nfse-tecnos.com.br:9084',
             'SubstituirNfseEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9086',
-            'EnviarLoteRpsSincronoEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9091',
+            'EnvioLoteRPSSincrono' => 'http://homologatapejara.nfse-tecnos.com.br:9091',
             'EnvioLoteNotasTomadas' => 'http://homologatapejara.nfse-tecnos.com.br:9092',
             'ConsultarNfseServicoTomadoEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9093',
             'ConsultarNfseServicoPrestadoEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9094',
-            'ConsultarNfseRpsEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9095',
+            'ConsultaNFSePorRPS' => 'http://homologatapejara.nfse-tecnos.com.br:9095',
             'ConsultarNfseFaixaEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9096',
             'ConsultarLoteRpsEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9097',
             'CancelarNfseEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9098',
         ]
     ];
-    /**
-     * County Namespace
-     * @var string
-     */
-    protected $xmlns = 'http://tempuri.org/';
 
     /**
      * Soap Version
@@ -93,6 +88,20 @@ class Tools extends ToolsModel
     ];
 
     /**
+     * @param $lote
+     * @param $rpss
+     * @return string
+     */
+    public function recepcionarLoteRpsSincrono($lote, $rpss)
+    {
+        $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\RecepcionarLoteRps";
+        $fact = new $class($this->certificate);
+        $this->soapAction = 'http://tempuri.org/mEnvioLoteRPSSincrono';
+        return $this->recepcionarLoteRpsSincronoCommon($fact, $lote, $rpss);
+    }
+
+
+    /**
      * Os métodos que realizar operações no webservice precisam ser sobrescritos (Override)
      * somente para setar o soapAction espefico de cada operação (INFSEGeracao, INFSEConsultas, etc.)
      * @param $protocolo
@@ -126,8 +135,7 @@ class Tools extends ToolsModel
             "Content-Type: text/xml; charset=utf-8;charset=utf-8;",
             "SOAPAction: \"{$this->soapAction}\""
         ];
-
-        $action = '';
+        $action = $this->soapAction;
         return $this->soap->send(
             $url,
             $this->method,

@@ -35,29 +35,36 @@ class Rps extends RpsBase
     const STATUS_NORMAL = 1;
     const STATUS_CANCELADO = 2;
 
+    const REGIME_NENHUM = 0;
     const REGIME_MICROEMPRESA = 1;
     const REGIME_ESTIMATIVA = 2;
     const REGIME_SOCIEDADE = 3;
     const REGIME_COOPERATIVA = 4;
+    const REGIME_MEI = 5;
+    const REGIME_ME_EPP = 6;
 
-    const NATUREZA_INTERNA = 1; //Tributação no município
-    const NATUREZA_EXTERNA = 2;  //Tributação fora do município
+    const NATUREZA_EXIGIVEL = 1; //Tributação no município
+    const NATUREZA_NAO_INCIDENCIA = 2;  //Tributação fora do município
     const NATUREZA_ISENTA = 3; //Isenção
-    const NATUREZA_IMUNE = 4; //Imune
-    const NATUREZA_SUSPENSA_JUS = 5; //Exigibilidade suspensa por decisão judicial
-    const NATUREZA_SUSPENSA_ADMIN = 6; //Exigibilidade suspensa por procedimento administrativo
+    const NATUREZA_EXPORTACAO = 4;
+    const NATUREZA_IMUNE = 5;
+    const NATUREZA_SUSPENSA_JUS = 6; //Exigibilidade suspensa por decisão judicial
+    const NATUREZA_SUSPENSA_ADMIN = 7; //Exigibilidade suspensa por procedimento administrativo
 
     const SIM = 1;
     const NAO = 2;
 
+    const TOMADOR = 2;
+    const INTERMEDIARIO = 2;
+
     /**
      * @var array
      */
-    public $infPrestador = ['tipo' => '', 'cnpjcpf' => '', 'im' => ''];
+    public $infPrestador = ['tipo' => '', 'cnpjcpf' => '', 'razaosocial' => '', 'im' => ''];
     /**
      * @var array
      */
-    public $infTomador = ['tipo' => '', 'cnpjcpf' => '', 'im' => '', 'razao' => '', 'tel' => '', 'email' => ''];
+    public $infTomador = ['tipo' => '', 'cnpjcpf' => '', 'im' => '', 'ie' => '', 'razao' => '', 'tel' => '', 'email' => ''];
     /**
      * @var array
      */
@@ -68,6 +75,7 @@ class Rps extends RpsBase
         'bairro' => '',
         'cmun' => '',
         'uf' => '',
+        'codigopais' => '',
         'cep' => ''
     ];
     /**
@@ -118,6 +126,14 @@ class Rps extends RpsBase
      * @var int
      */
     public $infRegimeEspecialTributacao;
+    /**
+     * @var float
+     */
+    public $infBaseCalculoCRS;
+    /**
+     * @var float
+     */
+    public $infIrrfIndenizacao;
     /**
      * @var float
      */
@@ -187,6 +203,10 @@ class Rps extends RpsBase
      */
     public $infItemListaServico;
     /**
+     * @var string
+     */
+    public $infResponsavelRetencao;
+    /**
      * @var int
      */
     public $infCodigoCnae;
@@ -202,18 +222,28 @@ class Rps extends RpsBase
      * @var int
      */
     public $infMunicipioPrestacaoServico;
+    /**
+     * @var int
+     */
+    public $infCodigoPais;
+    /**
+     * @var int
+     */
+    public $infNumeroProcesso;
 
     /**
      * Set informations of provider
      * @param int $tipo
      * @param string $cnpjcpf
+     * @param string $razaosocial
      * @param string $im
      */
-    public function prestador($tipo, $cnpjcpf, $im)
+    public function prestador($tipo, $cnpjcpf, $razaosocial, $im)
     {
         $this->infPrestador = [
             'tipo' => $tipo,
             'cnpjcpf' => $cnpjcpf,
+            'razaosocial' => $razaosocial,
             'im' => $im
         ];
     }
@@ -227,12 +257,13 @@ class Rps extends RpsBase
      * @param string $telefone
      * @param string $email
      */
-    public function tomador($tipo, $cnpjcpf, $im, $razao, $telefone, $email)
+    public function tomador($tipo, $cnpjcpf, $im, $ie, $razao, $telefone, $email)
     {
         $this->infTomador = [
             'tipo' => $tipo,
             'cnpjcpf' => $cnpjcpf,
             'im' => $im,
+            'ie' => $ie,
             'razao' => $razao,
             'tel' => $telefone,
             'email' => $email
@@ -249,7 +280,7 @@ class Rps extends RpsBase
      * @param string $uf
      * @param int $cep
      */
-    public function tomadorEndereco($end, $numero, $complemento, $bairro, $cmun, $uf, $cep)
+    public function tomadorEndereco($end, $numero, $complemento, $bairro, $cmun, $uf, $codigopais, $cep)
     {
         $this->infTomadorEndereco = [
             'end' => $end,
@@ -258,6 +289,7 @@ class Rps extends RpsBase
             'bairro' => $bairro,
             'cmun' => $cmun,
             'uf' => $uf,
+            'codigopais' => $codigopais,
             'cep' => $cep
         ];
     }
@@ -371,7 +403,7 @@ class Rps extends RpsBase
      * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
      * @throws InvalidArgumentException
      */
-    public function naturezaOperacao($value = self::NATUREZA_INTERNA, $campo = null)
+    public function naturezaOperacao($value = self::NATUREZA_EXIGIVEL, $campo = null)
     {
         if (!$campo) {
             $msg = "A natureza da operação deve estar entre 1 e 6.";
@@ -454,12 +486,12 @@ class Rps extends RpsBase
     public function regimeEspecialTributacao($value = self::REGIME_MICROEMPRESA, $campo = null)
     {
         if (!$campo) {
-            $msg = "O regime de tributação deve estar entre 1 e 4.";
+            $msg = "O regime de tributação deve estar entre 0 e 6.";
         } else {
-            $msg = "O item '$campo' deve estar entre 1 e 4. Informado: '$value'";
+            $msg = "O item '$campo' deve estar entre 0 e 6. Informado: '$value'";
         }
 
-        if (!Validator::numericVal()->intVal()->between(1, 4)->validate($value)) {
+        if (!Validator::numericVal()->intVal()->between(0, 4)->validate($value)) {
             throw new InvalidArgumentException($msg);
         }
         $this->infRegimeEspecialTributacao = $value;
@@ -483,6 +515,44 @@ class Rps extends RpsBase
             throw new InvalidArgumentException($msg);
         }
         $this->infValorServicos = round($value, 2);
+    }
+
+    /**
+     * @param float $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function baseCalculoCRS($value = 0.00, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "Os valores devem ser numericos tipo float.";
+        } else {
+            $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
+        }
+
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
+        }
+        $this->infBaseCalculoCRS = round($value, 2);
+    }
+
+    /**
+     * @param float $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function irrfIndenizacao($value = 0.00, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "Os valores devem ser numericos tipo float.";
+        } else {
+            $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
+        }
+
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
+        }
+        $this->infIrrfIndenizacao = round($value, 2);
     }
 
     /**
@@ -811,6 +881,27 @@ class Rps extends RpsBase
     }
 
     /**
+     * Set Services List item
+     * @param string $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function responsavelRetencao($value, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "O item da lista é obrigatório e deve ter no máximo 5 caracteres.";
+        } else {
+            $msg = "O item '$campo' é obrigatório e deve ter no máximo 5 caracteres. Informado: '$value'";
+        }
+
+        $value = trim($value);
+        if (!Validator::stringType()->length(1, 5)->validate($value)) {
+            throw new InvalidArgumentException($msg);
+        }
+        $this->infResponsavelRetencao = $value;
+    }
+
+    /**
      * Set CNAE code
      * @param int $value
      * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
@@ -827,7 +918,7 @@ class Rps extends RpsBase
         if (!Validator::numericVal()->intVal()->validate($value)) {
             throw new InvalidArgumentException($msg);
         }
-        $this->infCodigoCnae = $value;
+        $this->infCodigoCnae = 0; // valor padrao pela documentacao
     }
 
     /**
@@ -900,5 +991,45 @@ class Rps extends RpsBase
             throw new InvalidArgumentException($msg);
         }
         $this->infMunicipioPrestacaoServico = $value;
+    }
+
+    /**
+     * Set IBGE county code where service was realized
+     * @param int $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function codigoPais($value, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "Deve ser passado o código do IBGE.";
+        } else {
+            $msg = "O item '$campo' deve ser inteiro, referente ao código IBGE. Informado: '$value'";
+        }
+
+        if (!Validator::numericVal()->intVal()->validate($value)) {
+            throw new InvalidArgumentException($msg);
+        }
+        $this->infCodigoPais = $value;
+    }
+
+    /**
+     * Set IBGE county code where service was realized
+     * @param string $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function numeroProcesso($value, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "Deve ser passado o numero do processo.";
+        } else {
+            $msg = "O item '$campo' deve ser string, referente ao numero do processo. Informado: '$value'";
+        }
+
+        if (!Validator::stringType()->length(0, 100)->validate($value)) {
+            throw new InvalidArgumentException($msg);
+        }
+        $this->infNumeroProcesso = $value;
     }
 }

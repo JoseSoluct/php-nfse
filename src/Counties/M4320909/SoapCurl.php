@@ -65,7 +65,6 @@ class SoapCurl extends SoapBase
         $envelope = $this->makeSendEnvelope($namespaces, $request);
         $this->requestHead = implode("\n", $parameters);
         $this->requestBody = $envelope;
-
         try {
             $oCurl = curl_init();
 
@@ -129,7 +128,7 @@ class SoapCurl extends SoapBase
             throw SoapException::soapFault($this->soaperror . " [$url]", $this->soaperror_code);
         }
         if ($httpcode != 200) {
-            throw SoapException::soapFault(" [$url]" . $this->responseHead, $httpcode);
+            throw SoapException::soapFault(" [$url]" . $this->responseHead . ' - ' . $this->responseBody, $httpcode);
         }
         return $this->responseBody;
     }

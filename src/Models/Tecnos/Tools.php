@@ -58,7 +58,7 @@ class Tools extends ToolsBase
      */
     protected function recepcionarLoteRpsSincronoCommon($fact, $lote, $rpss, $url = '')
     {
-        $this->method = 'EnviarLoteRpsSincronoEnvio';
+        $this->method = 'EnvioLoteRPSSincrono';
         $fact->setXmlns($this->xmlns);
         $fact->setSchemeFolder($this->schemeFolder);
         $fact->setCodMun($this->config->cmun);
@@ -112,7 +112,7 @@ class Tools extends ToolsBase
      */
     public function consultarNfsePorRps($numero, $serie, $tipo)
     {
-        $class = "NFePHP\\NFSe\\Models\\Abrasf\\Factories\\v{$this->versao}\\ConsultarNfsePorRps";
+        $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\ConsultarNfsePorRps";
         $fact = new $class($this->certificate);
         return $this->consultarNfsePorRpsCommon($fact, $numero, $serie, $tipo);
     }
@@ -127,13 +127,9 @@ class Tools extends ToolsBase
      */
     protected function consultarNfsePorRpsCommon($fact, $numero, $serie, $tipo, $url = '')
     {
-        $this->method = 'ConsultarNfsePorRps';
-        $fact->setXmlns($this->xmlns);
-        $fact->setSchemeFolder($this->schemeFolder);
-        $fact->setCodMun($this->config->cmun);
-        $fact->setSignAlgorithm($this->algorithm);
-        $fact->setTimezone($this->timezone);
-        $message = $fact->render($this->versao, $this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteIM, $numero, $serie, $tipo);
+        $this->method = 'ConsultaNFSePorRPS';
+        $this->soapAction = 'http://tempuri.org/mConsultaNFSePorRPS';
+        $message = $fact->render($this->versao, $this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteRazao, $this->remetenteIM, $numero, $serie, $tipo);
         return $this->sendRequest($url, $message);
     }
 
@@ -150,7 +146,6 @@ class Tools extends ToolsBase
         if (!$url) {
             $url = $this->url[$this->config->tpAmb][$this->method];
         }
-
         if (!is_object($this->soap)) {
             $this->soap = new SoapCurl($this->certificate);
         }
