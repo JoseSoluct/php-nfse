@@ -23,7 +23,7 @@ class NFSeTest extends TestCase
         $this->fixturesPath = dirname(__FILE__) . '/fixtures/';
         $config = [
             "atualizacao" => date("Y-m-d H:i:s"),
-            "tpAmb" => 2,
+            "tpAmb" => 1,
             "versao" => 1,
             "razaosocial" => "PRIORIZA SISTEMAS LTDA",
             "cnpj" => "48704149000188",
@@ -77,7 +77,8 @@ class NFSeTest extends TestCase
             $this->configJson,
             Certificate::readPfx($this->contentpfx, $this->passwordpfx)
         );
-        $response = $nfse->tools->consultarNfsePorRps(1, 'UNICA', 1);
+        $response = $nfse->tools->consultarNfsePorRps(2765, 'UNICA', 1);
+        echo $response;
         $this->assertIsString($response, 'O response não é uma string.');
         $this->assertStringContainsString('<?xml', $response, 'O response não contém XML válido.');
     }
@@ -145,6 +146,7 @@ class NFSeTest extends TestCase
         $rps->valorLiquidoNfse(1);
 
         //$rps->construcaoCivil('1234', '234-4647-aa');
+
 
         //envio do RPS
         $response = $nfse->tools->recepcionarLoteRpsSincrono(1, [$rps]);

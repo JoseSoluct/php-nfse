@@ -129,6 +129,7 @@ class Tools extends ToolsBase
     {
         $this->method = 'ConsultaNFSePorRPS';
         $this->soapAction = 'http://tempuri.org/mConsultaNFSePorRPS';
+        $this->xmlns = 'http://tempuri.org/';
         $message = $fact->render($this->versao, $this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteRazao, $this->remetenteIM, $numero, $serie, $tipo);
         return $this->sendRequest($url, $message);
     }
@@ -192,7 +193,7 @@ class Tools extends ToolsBase
                     . "</remessa>"
                     . "<cabecalho>"
                     . "<![CDATA["
-                    . "<cabecalho><versaoDados>{$versao}</versaoDados></cabecalho>"
+                    . "<cabecalho xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns=\"http://www.abrasf.org.br/nfse.xsd\"><versaoDados>{$versao}</versaoDados></cabecalho>"
                     . "]]>"
                     . "</cabecalho>"
                     . "</m{$this->method}>";

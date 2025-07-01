@@ -28,7 +28,7 @@ class Tools extends ToolsModel
      */
     protected $url = [
         1 => [
-
+            'ConsultaNFSePorRPS' => 'http://tapejara.nfse-tecnos.com.br:9095/ConsultaNFSePorRPS.asmx',
         ],
         2 => [
             'ConsultaLoteNotasTomadas' => 'http://homologatapejara.nfse-tecnos.com.br:9083',
@@ -130,12 +130,12 @@ class Tools extends ToolsModel
         $dom->loadXML($message);
 
         $request = $this->makeRequest($message);
-
         $this->params = [
-            "Content-Type: text/xml; charset=utf-8;charset=utf-8;",
+            "Content-Type: text/xml; charset=utf-8;",
             "SOAPAction: \"{$this->soapAction}\""
         ];
-        $action = $this->soapAction;
+//        echo var_dump($request);die;
+        $action = '';
         return $this->soap->send(
             $url,
             $this->method,

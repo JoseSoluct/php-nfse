@@ -65,6 +65,9 @@ class SoapCurl extends SoapBase
         $envelope = $this->makeSendEnvelope($namespaces, $request);
         $this->requestHead = implode("\n", $parameters);
         $this->requestBody = $envelope;
+        $envelope = str_replace('<?xml version="1.0"?>', '', $envelope);
+        $envelope = str_replace('<?xml version="1.0" encoding="utf-8"?>', '', $envelope);
+        $envelope = str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $envelope);
         try {
             $oCurl = curl_init();
 
@@ -99,12 +102,13 @@ class SoapCurl extends SoapBase
                 curl_setopt($oCurl, CURLOPT_POST, 1);
                 curl_setopt($oCurl, CURLOPT_POSTFIELDS, $envelope);
                 curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
+//                echo var_dump($parameters);die;
             }
+
             $response = curl_exec($oCurl);
             $this->soaperror = curl_error($oCurl);
             $this->soaperror_code = curl_errno($oCurl);
             $ainfo = curl_getinfo($oCurl);
-
             if (is_array($ainfo)) {
                 $this->soapinfo = $ainfo;
             }
