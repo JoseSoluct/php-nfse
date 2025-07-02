@@ -125,7 +125,6 @@ class ConsultarNfsePorRps extends Factory
         //Parse para XML
         $body = $dom->saveXML();
         $body = $this->clear($body);
-//        echo $body;die;
         $this->validar($versao, $body, $this->schemeFolder, $xsd, '');
 
         return $body;
