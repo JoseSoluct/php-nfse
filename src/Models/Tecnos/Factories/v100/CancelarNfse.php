@@ -8,6 +8,27 @@ use NFePHP\NFSe\Models\Tecnos\Factories\Signer;
 
 class CancelarNfse extends Factory
 {
+    protected $xmlns = 'http://www.abrasf.org.br/nfse.xsd';
+    protected $schemeFolder = 'v100';
+    protected $cmun = '0';
+    public $timezone = 'America/Sao_Paulo';
+
+    public function setXmlns(string $xmlns): void
+    {
+        $this->xmlns = $xmlns;
+    }
+
+    public function setSchemeFolder(string $schemeFolder): void
+    {
+        $this->schemeFolder = $schemeFolder;
+    }
+
+    public function setCmun(string $cmun): void
+    {
+        $this->cmun = $cmun;
+    }
+
+
     /**
      * Método usado para gerar o XML do Soap Request
      * @param $remetenteTipoDoc

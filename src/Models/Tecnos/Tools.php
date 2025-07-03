@@ -225,7 +225,6 @@ class Tools extends ToolsBase
         $fact->setSchemeFolder($this->schemeFolder);
         $fact->setCodMun($this->config->cmun);
         $fact->setSignAlgorithm($this->algorithm);
-        $fact->setTimezone($this->timezone);
         $message = $fact->render($this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteIM, $nfseNumero, $codigoCancelamento, $motivoCancelamento);
         return $this->sendRequest($url, $message);
     }
