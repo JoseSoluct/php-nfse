@@ -223,7 +223,7 @@ class Tools extends ToolsBase
         $this->method = 'CancelarNfse';
         $fact->setXmlns($this->xmlns);
         $fact->setSchemeFolder($this->schemeFolder);
-        $fact->setCodMun($this->config->cmun);
+        $fact->setCmun($this->config->cmun);
         $fact->setSignAlgorithm($this->algorithm);
         $message = $fact->render($this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteIM, $nfseNumero, $codigoCancelamento, $motivoCancelamento);
         return $this->sendRequest($url, $message);
