@@ -29,14 +29,6 @@ class Tools extends ToolsBase
     protected $params = [];
 
     /**
-     * @param $xmlns
-     */
-    public function setXmlns($xmlns)
-    {
-        $this->xmlns = $xmlns;
-    }
-
-    /**
      * @param $lote
      * @param $rpss
      * @return string
@@ -70,62 +62,6 @@ class Tools extends ToolsBase
             $rpss
         );
         $this->xmlns = 'http://tempuri.org/';
-        return $this->sendRequest($url, $message);
-    }
-    /**
-     * Consulta Lote
-     * @return string
-     */
-    public function consultarSequenciaLoteNota()
-    {
-        $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\ConsultarSequenciaLoteNotaRps";
-        $fact = new $class($this->certificate);
-        return $this->consultarSequenciaLoteNotaCommom($fact);
-    }
-
-    /**
-     * @param $fact
-     * @param $protocolo
-     * @return string
-     */
-    protected function consultarSequenciaLoteNotaCommom($fact, $url = '')
-    {
-        $this->method = 'ConsultaSequenciaLoteNotaRPS';
-        $this->setXmlns($this->xmlns);
-        $message = $fact->render($this->remetenteCNPJCPF, $this->remetenteRazao, $this->remetenteIM);
-        $this->soapAction = 'http://tempuri.org/mConsultaSequenciaLoteNotaRPS';
-        $this->xmlns = 'http://tempuri.org/';
-        return $this->sendRequest($url, $message);
-    }
-
-    /**
-     * @param $numero
-     * @param $serie
-     * @param $tipo
-     * @param string $url
-     * @return string
-     */
-    public function consultarNfsePorRps($numero, $serie, $tipo)
-    {
-        $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\ConsultarNfsePorRps";
-        $fact = new $class($this->certificate);
-        return $this->consultarNfsePorRpsCommon($fact, $numero, $serie, $tipo);
-    }
-
-    /**
-     * @param $fact
-     * @param $numero
-     * @param $serie
-     * @param $tipo
-     * @param string $url
-     * @return string
-     */
-    protected function consultarNfsePorRpsCommon($fact, $numero, $serie, $tipo, $url = '')
-    {
-        $this->method = 'ConsultaNFSePorRPS';
-        $this->soapAction = 'http://tempuri.org/mConsultaNFSePorRPS';
-        $this->xmlns = 'http://tempuri.org/';
-        $message = $fact->render($this->versao, $this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteRazao, $this->remetenteIM, $numero, $serie, $tipo);
         return $this->sendRequest($url, $message);
     }
 
@@ -197,6 +133,101 @@ class Tools extends ToolsBase
                 throw new LogicException('Versão não suportada');
         }
         return $request;
+    }
+
+    /**
+     * Consulta Lote
+     * @return string
+     */
+    public function consultarSequenciaLoteNota()
+    {
+        $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\ConsultarSequenciaLoteNotaRps";
+        $fact = new $class($this->certificate);
+        return $this->consultarSequenciaLoteNotaCommom($fact);
+    }
+
+    /**
+     * @param $fact
+     * @param $protocolo
+     * @return string
+     */
+    protected function consultarSequenciaLoteNotaCommom($fact, $url = '')
+    {
+        $this->method = 'ConsultaSequenciaLoteNotaRPS';
+        $this->setXmlns($this->xmlns);
+        $message = $fact->render($this->remetenteCNPJCPF, $this->remetenteRazao, $this->remetenteIM);
+        $this->soapAction = 'http://tempuri.org/mConsultaSequenciaLoteNotaRPS';
+        $this->xmlns = 'http://tempuri.org/';
+        return $this->sendRequest($url, $message);
+    }
+
+    /**
+     * @param $xmlns
+     */
+    public function setXmlns($xmlns)
+    {
+        $this->xmlns = $xmlns;
+    }
+
+    /**
+     * @param $numero
+     * @param $serie
+     * @param $tipo
+     * @param string $url
+     * @return string
+     */
+    public function consultarNfsePorRps($numero, $serie, $tipo)
+    {
+        $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\ConsultarNfsePorRps";
+        $fact = new $class($this->certificate);
+        return $this->consultarNfsePorRpsCommon($fact, $numero, $serie, $tipo);
+    }
+
+    /**
+     * @param $fact
+     * @param $numero
+     * @param $serie
+     * @param $tipo
+     * @param string $url
+     * @return string
+     */
+    protected function consultarNfsePorRpsCommon($fact, $numero, $serie, $tipo, $url = '')
+    {
+        $this->method = 'ConsultaNFSePorRPS';
+        $this->soapAction = 'http://tempuri.org/mConsultaNFSePorRPS';
+        $this->xmlns = 'http://tempuri.org/';
+        $message = $fact->render($this->versao, $this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteRazao, $this->remetenteIM, $numero, $serie, $tipo);
+        return $this->sendRequest($url, $message);
+    }
+
+    /**
+     * Consulta Lote
+     * @param string $nfseNumero
+     * @return string
+     */
+    public function cancelarNfse($codigoMunicipio, $nfseNumero, $codigoCancelamento, $motivoCancelamento)
+    {
+        $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\CancelarNfse";
+        $fact = new $class($this->certificate);
+        return $this->cancelarNfseCommon($fact, $codigoMunicipio, $nfseNumero, $codigoCancelamento, $motivoCancelamento);
+    }
+
+    /**
+     * @param $fact
+     * @param string $nfseNumero
+     * @param string $url
+     * @return string
+     */
+    protected function cancelarNfseCommon($fact, $codigoMunicipio, $nfseNumero, $codigoCancelamento, $motivoCancelamento, $url = '')
+    {
+        $this->method = 'CancelarNfse';
+        $fact->setXmlns($this->xmlns);
+        $fact->setSchemeFolder($this->schemeFolder);
+        $fact->setCodMun($this->config->cmun);
+        $fact->setSignAlgorithm($this->algorithm);
+        $fact->setTimezone($this->timezone);
+        $message = $fact->render($this->remetenteTipoDoc, $this->remetenteCNPJCPF, $codigoMunicipio, $this->remetenteIM, $nfseNumero, $codigoCancelamento, $motivoCancelamento);
+        return $this->sendRequest($url, $message);
     }
 //
 //    /**

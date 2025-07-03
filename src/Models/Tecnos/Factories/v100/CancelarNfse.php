@@ -2,31 +2,35 @@
 
 namespace NFePHP\NFSe\Models\Tecnos\Factories\v100;
 
-use NFePHP\NFSe\Models\Tecnos\Factories\Factory;
 use NFePHP\Common\DOMImproved as Dom;
+use NFePHP\NFSe\Models\Tecnos\Factories\Factory;
 use NFePHP\NFSe\Models\Tecnos\Factories\Signer;
 
 class CancelarNfse extends Factory
 {
     /**
      * Método usado para gerar o XML do Soap Request
-     * @param $versao
      * @param $remetenteTipoDoc
      * @param $remetenteCNPJCPF
+     * @param $codigoMunicipio
      * @param $inscricaoMunicipal
+     * @param $nfseNumero
+     * @param $codigoCancelamento
+     * @param $motivoCancelamento
      * @return string
      */
     public function render(
-        $versao,
+
         $remetenteTipoDoc,
         $remetenteCNPJCPF,
+        $codigoMunicipio,
         $inscricaoMunicipal,
-        $nfseNumero
+        $nfseNumero,
+        $codigoCancelamento,
+        $motivoCancelamento
     ) 
     {
         $method = 'CancelarNfseEnvio';
-        $xsd = "servico_cancelar_nfse_envio";
-
 
         $dom = new Dom('1.0', 'utf-8');
         $dom->formatOutput = false;
@@ -100,7 +104,7 @@ class CancelarNfse extends Factory
         $dom->addChild(
             $identificacaoNfse,
             'CodigoMunicipio',
-            $this->codMun,
+            $codigoMunicipio,
             false,
             "Código Municipio",
             false
@@ -110,9 +114,19 @@ class CancelarNfse extends Factory
         $dom->addChild(
             $InfPedidoCancelamento,
             'CodigoCancelamento',
-            2,
+            $codigoCancelamento,
             false,
             "Código Municipio",
+            false
+        );
+
+        /* Código do Cancelamento */
+        $dom->addChild(
+            $InfPedidoCancelamento,
+            'MotivoCancelamento',
+            $motivoCancelamento,
+            false,
+            "Motivo Cancelamento",
             false
         );
 
@@ -130,8 +144,6 @@ class CancelarNfse extends Factory
             true
         );
         $body = $this->clear($body);
-        
-        //$this->validar($versao, $body, $this->schemeFolder, $xsd, '');
 
         return $body;
     }
