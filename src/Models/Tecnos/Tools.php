@@ -205,11 +205,11 @@ class Tools extends ToolsBase
      * @param string $nfseNumero
      * @return string
      */
-    public function cancelarNfse($codigoMunicipio, $nfseNumero, $codigoCancelamento, $motivoCancelamento)
+    public function cancelarNfse($nfseNumero, $codigoCancelamento, $motivoCancelamento)
     {
         $class = "NFePHP\\NFSe\\Models\\Tecnos\\Factories\\v{$this->versao}\\CancelarNfse";
         $fact = new $class($this->certificate);
-        return $this->cancelarNfseCommon($fact, $codigoMunicipio, $nfseNumero, $codigoCancelamento, $motivoCancelamento);
+        return $this->cancelarNfseCommon($fact, $nfseNumero, $codigoCancelamento, $motivoCancelamento);
     }
 
     /**
@@ -218,7 +218,7 @@ class Tools extends ToolsBase
      * @param string $url
      * @return string
      */
-    protected function cancelarNfseCommon($fact, $codigoMunicipio, $nfseNumero, $codigoCancelamento, $motivoCancelamento, $url = '')
+    protected function cancelarNfseCommon($fact, $nfseNumero, $codigoCancelamento, $motivoCancelamento, $url = '')
     {
         $this->method = 'CancelarNfse';
         $fact->setXmlns($this->xmlns);
@@ -226,7 +226,7 @@ class Tools extends ToolsBase
         $fact->setCodMun($this->config->cmun);
         $fact->setSignAlgorithm($this->algorithm);
         $fact->setTimezone($this->timezone);
-        $message = $fact->render($this->remetenteTipoDoc, $this->remetenteCNPJCPF, $codigoMunicipio, $this->remetenteIM, $nfseNumero, $codigoCancelamento, $motivoCancelamento);
+        $message = $fact->render($this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteIM, $nfseNumero, $codigoCancelamento, $motivoCancelamento);
         return $this->sendRequest($url, $message);
     }
 //

@@ -12,7 +12,6 @@ class CancelarNfse extends Factory
      * Método usado para gerar o XML do Soap Request
      * @param $remetenteTipoDoc
      * @param $remetenteCNPJCPF
-     * @param $codigoMunicipio
      * @param $inscricaoMunicipal
      * @param $nfseNumero
      * @param $codigoCancelamento
@@ -23,7 +22,6 @@ class CancelarNfse extends Factory
 
         $remetenteTipoDoc,
         $remetenteCNPJCPF,
-        $codigoMunicipio,
         $inscricaoMunicipal,
         $nfseNumero,
         $codigoCancelamento,
@@ -104,7 +102,7 @@ class CancelarNfse extends Factory
         $dom->addChild(
             $identificacaoNfse,
             'CodigoMunicipio',
-            $codigoMunicipio,
+            $this->cmun,
             false,
             "Código Municipio",
             false
