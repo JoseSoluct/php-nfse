@@ -225,6 +225,7 @@ class Tools extends ToolsBase
         $fact->setSchemeFolder($this->schemeFolder);
         $fact->setCmun($this->config->cmun);
         $fact->setSignAlgorithm($this->algorithm);
+        $this->soapAction = 'http://tempuri.org/mCancelamentoNFSe';
         $message = $fact->render($this->remetenteTipoDoc, $this->remetenteCNPJCPF, $this->remetenteIM, $nfseNumero, $codigoCancelamento, $motivoCancelamento);
         return $this->sendRequest($url, $message);
     }
