@@ -34,7 +34,7 @@ class Tools extends ToolsModel
             'ConsultaSequenciaLoteNotaRPS' => 'http://homologatapejara.nfse-tecnos.com.br:9084/ConsultaSequenciaLoteNotaRPS.asmx',
             'EnvioLoteRPSSincrono' => 'http://homologatapejara.nfse-tecnos.com.br:9091/EnvioLoteRPSSincrono.asmx',
             'ConsultaNFSePorRPS' => 'http://homologatapejara.nfse-tecnos.com.br:9095/ConsultaNFSePorRPS.asmx',
-            'CancelarNfseEnvio' => 'http://homologatapejara.nfse-tecnos.com.br:9098/CancelamentoNFSe.asmx',
+            'CancelarNfse' => 'http://homologatapejara.nfse-tecnos.com.br:9098/CancelamentoNFSe.asmx',
         ]
     ];
 
