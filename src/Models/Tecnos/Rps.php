@@ -230,6 +230,14 @@ class Rps extends RpsBase
      * @var int
      */
     public $infNumeroProcesso;
+    /**
+     * @var string
+     */
+    public $codigoNbs;
+    /**
+     * @var string
+     */
+    public $codigoServicoNacional;
 
     /**
      * Set informations of provider
@@ -1031,5 +1039,27 @@ class Rps extends RpsBase
             throw new InvalidArgumentException($msg);
         }
         $this->infNumeroProcesso = $value;
+    }
+
+    /**
+     * Set codigo de NBS do servico
+     * @param string $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function codigoNbs($value, $campo = null)
+    {
+        $this->codigoNbs = $value;
+    }
+
+    /**
+     * Set codigo de serviço nacional LC 116
+     * @param string $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function codigoServicoNacional($value, $campo = null)
+    {
+        $this->codigoServicoNacional = $value;
     }
 }

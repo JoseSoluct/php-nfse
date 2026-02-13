@@ -392,6 +392,22 @@ class RenderRps extends RenderRPSBase
             'NumeroProcesso',
             false
         );
+        self::$dom->addChild(
+            $tcDadosServico,
+            'CodigoNBS',
+            $rps->codigoNbs,
+            true,
+            'CodigoNBS',
+            false
+        );
+        self::$dom->addChild(
+            $tcDadosServico,
+            'CodigoServicoNacional',
+            $rps->codigoServicoNacional,
+            true,
+            'CodigoServicoNacional',
+            false
+        );
         self::$dom->appChild($servico, $tcDadosServico, 'Adicionando tag Valores em Servico');
         self::$dom->appChild($infRPS, $servico, 'Adicionando tag Servico');
         /** FIM Serviços **/
