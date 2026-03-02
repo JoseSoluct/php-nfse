@@ -499,7 +499,7 @@ class Rps extends RpsBase
             $msg = "O item '$campo' deve estar entre 0 e 6. Informado: '$value'";
         }
 
-        if (!Validator::numericVal()->intVal()->between(0, 4)->validate($value)) {
+        if (!Validator::numericVal()->intVal()->between(0, 6)->validate($value)) {
             throw new InvalidArgumentException($msg);
         }
         $this->infRegimeEspecialTributacao = $value;
