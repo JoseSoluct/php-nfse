@@ -29,6 +29,9 @@ class Tools extends ToolsModel
     protected $url = [
         1 => [
             'ConsultaNFSePorRPS' => 'http://tapejara.nfse-tecnos.com.br:9095/ConsultaNFSePorRPS.asmx',
+            'ConsultaSequenciaLoteNotaRPS' => 'http://tapejara.nfse-tecnos.com.br:9084/ConsultaSequenciaLoteNotaRPS.asmx',
+            'EnvioLoteRPSSincrono' => 'http://tapejara.nfse-tecnos.com.br:9091/EnvioLoteRPSSincrono.asmx',
+            'CancelarNfse' => 'http://tapejara.nfse-tecnos.com.br:9098/CancelamentoNFSe.asmx',
         ],
         2 => [
             'ConsultaSequenciaLoteNotaRPS' => 'http://homologatapejara.nfse-tecnos.com.br:9084/ConsultaSequenciaLoteNotaRPS.asmx',
