@@ -171,6 +171,17 @@ class RenderRps extends RenderRPSBase
             false
         );
 
+        if (!empty($rps->infIdCidade)) {
+            self::$dom->addChild(
+                $infRPS,
+                'IdCidade',
+                $rps->infIdCidade,
+                false,
+                'Id da Cidade',
+                false
+            );
+        }
+
         /** Serviços **/
         $servico = self::$dom->createElement('Servico');
 

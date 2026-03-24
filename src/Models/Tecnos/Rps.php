@@ -238,6 +238,10 @@ class Rps extends RpsBase
      * @var string
      */
     public $codigoServicoNacional;
+    /**
+     * @var int
+     */
+    public $infIdCidade;
 
     /**
      * Set informations of provider
@@ -1061,5 +1065,25 @@ class Rps extends RpsBase
     public function codigoServicoNacional($value, $campo = null)
     {
         $this->codigoServicoNacional = $value;
+    }
+
+    /**
+     * Set id da cidade (código IBGE do município)
+     * @param int $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function idCidade($value, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "O IdCidade deve ser um inteiro positivo.";
+        } else {
+            $msg = "O item '$campo' deve ser um inteiro positivo. Informado: '$value'";
+        }
+
+        if (!Validator::numericVal()->intVal()->positive()->validate($value)) {
+            throw new InvalidArgumentException($msg);
+        }
+        $this->infIdCidade = $value;
     }
 }
