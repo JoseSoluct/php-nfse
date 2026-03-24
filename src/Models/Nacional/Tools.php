@@ -123,6 +123,11 @@ class Tools extends ToolsBase
             throw new RuntimeException('URL do webservice NFS-e Nacional não configurada.');
         }
 
+        $certFile = tempnam(sys_get_temp_dir(), 'nfse_cert_');
+        $keyFile  = tempnam(sys_get_temp_dir(), 'nfse_key_');
+        file_put_contents($certFile, (string) $this->certificate->publicKey);
+        file_put_contents($keyFile, (string) $this->certificate->privateKey);
+
         $ch = curl_init();
 
         $options = [
@@ -130,6 +135,8 @@ class Tools extends ToolsBase
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 60,
             CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSLCERT        => $certFile,
+            CURLOPT_SSLKEY         => $keyFile,
         ];
 
         if (!empty($message)) {
@@ -153,6 +160,9 @@ class Tools extends ToolsBase
         $error    = curl_error($ch);
 
         curl_close($ch);
+
+        @unlink($certFile);
+        @unlink($keyFile);
 
         if ($errno) {
             throw new RuntimeException("Erro cURL ao comunicar com NFS-e Nacional: [{$errno}] {$error}");
