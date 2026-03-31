@@ -242,6 +242,18 @@ class Rps extends RpsBase
      * @var int
      */
     public $infIdCidade;
+    /**
+     * @var int|null
+     */
+    public $infFormaPagamento;
+    /**
+     * @var int
+     */
+    public $infNumeroParcelas = 0;
+    /**
+     * @var array<int, array{numero:int, valor:float, data_vencimento:DateTime}>
+     */
+    public $infParcelas = [];
 
     /**
      * Set informations of provider
@@ -1085,5 +1097,71 @@ class Rps extends RpsBase
             throw new InvalidArgumentException($msg);
         }
         $this->infIdCidade = $value;
+    }
+
+    /**
+     * Set identificação da forma de pagamento
+     * 0-Não identificada, 1-A Vista, 2-Apresentação,
+     * 3-A Prazo, 4-Cartão de Débito, 5-Cartão de Crédito.
+     * @param int $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function formaPagamento($value = 0, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "A forma de pagamento deve estar entre 0 e 5.";
+        } else {
+            $msg = "O item '$campo' deve ser um inteiro entre 0 e 5. Informado: '$value'";
+        }
+
+        if (!Validator::numericVal()->intVal()->between(0, 5)->validate($value)) {
+            throw new InvalidArgumentException($msg);
+        }
+        $this->infFormaPagamento = (int) $value;
+    }
+
+    /**
+     * Set número de parcelas
+     * @param int $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function numeroParcelas($value = 0, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "O número de parcelas deve ser um inteiro maior ou igual a zero.";
+        } else {
+            $msg = "O item '$campo' deve ser um inteiro maior ou igual a zero. Informado: '$value'";
+        }
+
+        if (!Validator::numericVal()->intVal()->min(0)->validate($value)) {
+            throw new InvalidArgumentException($msg);
+        }
+        $this->infNumeroParcelas = (int) $value;
+    }
+
+    /**
+     * Adiciona uma parcela para compor a tag Parcelamento.
+     * @param int $numero
+     * @param float $valor
+     * @param DateTime $dataVencimento
+     * @throws InvalidArgumentException
+     */
+    public function addParcela($numero, $valor, DateTime $dataVencimento)
+    {
+        if (!Validator::numericVal()->intVal()->positive()->validate($numero)) {
+            throw new InvalidArgumentException("O número da parcela deve ser inteiro positivo.");
+        }
+
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($valor)) {
+            throw new InvalidArgumentException("O valor da parcela deve ser numérico maior ou igual a zero.");
+        }
+
+        $this->infParcelas[] = [
+            'numero' => (int) $numero,
+            'valor' => round((float) $valor, 2),
+            'data_vencimento' => $dataVencimento,
+        ];
     }
 }

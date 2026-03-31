@@ -182,6 +182,72 @@ class RenderRps extends RenderRPSBase
             );
         }
 
+        if (!is_null($rps->infFormaPagamento)) {
+            self::$dom->addChild(
+                $infRPS,
+                'FormaPagamento',
+                $rps->infFormaPagamento,
+                false,
+                'Forma de pagamento',
+                false
+            );
+        }
+
+        if (!is_null($rps->infNumeroParcelas)) {
+            self::$dom->addChild(
+                $infRPS,
+                'NumeroParcelas',
+                $rps->infNumeroParcelas,
+                false,
+                'Número de parcelas',
+                false
+            );
+        }
+
+        if ((int) $rps->infNumeroParcelas > 0 && !empty($rps->infParcelas)) {
+            $parcelamento = self::$dom->createElement('Parcelamento');
+            $parcelas = self::$dom->createElement('Parcelas');
+
+            foreach ($rps->infParcelas as $parcela) {
+                $tcParcela = self::$dom->createElement('tcParcela');
+                self::$dom->addChild(
+                    $tcParcela,
+                    'Numero',
+                    $parcela['numero'],
+                    true,
+                    'Numero da parcela',
+                    false
+                );
+                self::$dom->addChild(
+                    $tcParcela,
+                    'Valor',
+                    $parcela['valor'],
+                    true,
+                    'Valor da parcela',
+                    false
+                );
+
+                $dataVencimento = $parcela['data_vencimento'];
+                $dataVencimentoFormatada = $dataVencimento instanceof \DateTimeInterface
+                    ? $dataVencimento->format('Y-m-d\\TH:i:s')
+                    : (string) $dataVencimento;
+
+                self::$dom->addChild(
+                    $tcParcela,
+                    'DataVencimento',
+                    $dataVencimentoFormatada,
+                    true,
+                    'Data de vencimento da parcela',
+                    false
+                );
+
+                self::$dom->appChild($parcelas, $tcParcela, 'Adicionando tcParcela em Parcelas');
+            }
+
+            self::$dom->appChild($parcelamento, $parcelas, 'Adicionando Parcelas em Parcelamento');
+            self::$dom->appChild($infRPS, $parcelamento, 'Adicionando Parcelamento em infRPS');
+        }
+
         /** Serviços **/
         $servico = self::$dom->createElement('Servico');
 
