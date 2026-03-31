@@ -29,6 +29,28 @@ class Tools extends ToolsBase
     protected $params = [];
 
     /**
+     * Registra XML de debug no error_log do PHP.
+     *
+     * Ative/desative via variável de ambiente NFSE_XML_DEBUG (default: ligado).
+     * Valores aceitos para desligar: 0, false, off, no.
+     *
+     * @param string $context
+     * @param string $xml
+     * @return void
+     */
+    protected function logXmlDebug($context, $xml)
+    {
+        $flag = getenv('NFSE_XML_DEBUG');
+        $disabledValues = ['0', 'false', 'off', 'no'];
+
+        if ($flag !== false && in_array(strtolower((string) $flag), $disabledValues, true)) {
+            return;
+        }
+
+        error_log("[NFSE XML DEBUG] {$context}:\n{$xml}");
+    }
+
+    /**
      * @param $lote
      * @param $rpss
      * @return string
@@ -75,6 +97,8 @@ class Tools extends ToolsBase
     {
         $this->xmlRequest = $message;
 
+        $this->logXmlDebug('xmlRequest(raw)', $message);
+
         if (!$url) {
             $url = $this->url[$this->config->tpAmb][$this->method];
         }
@@ -94,6 +118,9 @@ class Tools extends ToolsBase
             $messageText = $this->stringTransform($message);
         }
         $request = $this->makeRequest($messageText);
+
+        $this->logXmlDebug('soapRequest(final)', $request);
+
         //Realiza o request SOAP
         return $this->soap->send(
             $url,
@@ -156,6 +183,9 @@ class Tools extends ToolsBase
         $this->method = 'ConsultaSequenciaLoteNotaRPS';
         $this->setXmlns($this->xmlns);
         $message = $fact->render($this->remetenteCNPJCPF, $this->remetenteRazao, $this->remetenteIM);
+
+        $this->logXmlDebug('consultarSequenciaLoteNotaCommom(render)', $message);
+        
         $this->soapAction = 'http://tempuri.org/mConsultaSequenciaLoteNotaRPS';
         $this->xmlns = 'http://tempuri.org/';
         return $this->sendRequest($url, $message);
