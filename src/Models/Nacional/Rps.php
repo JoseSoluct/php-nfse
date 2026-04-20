@@ -74,6 +74,34 @@ class Rps extends RpsBase
     /** @var string Código IBGE do município emissor (7 dígitos) */
     public $infCLocEmi;
 
+    /**
+     * Motivo da emissão da DPS pelo Tomador/Intermediário (opcional):
+     * 1=Importação, 2=Obrigado por legislação municipal, 3=Recusa de emissão pelo prestador,
+     * 4=Rejeição da NFS-e emitida pelo prestador.
+     * @var int|null
+     */
+    public $infCMotivoEmisTI = null;
+
+    /** @var string|null Chave de acesso (50 dígitos) da NFS-e rejeitada pelo Tomador/Intermediário */
+    public $infChNFSeRej = null;
+
+    /**
+     * Substituição de NFS-e (grupo opcional):
+     *   chSubstda: chave (50) da NFS-e substituída
+     *   cMotivo: 01, 02, 03, 04, 05, 99
+     *   xMotivo: descrição (mín. 15 chars) — opcional
+     *
+     * @var array{chSubstda: string, cMotivo: string, xMotivo: string}|null
+     */
+    public $infSubst = null;
+
+    /**
+     * Intermediário (grupo opcional) — mesma estrutura de tomador.
+     *
+     * @var array{tipo: int, cnpjcpf: string, im: string, xNome: string, fone: string, email: string}|null
+     */
+    public $infIntermediario = null;
+
     // -------------------------------------------------------------------------
     // Prestador (prest)
     // -------------------------------------------------------------------------
@@ -125,27 +153,56 @@ class Rps extends RpsBase
     public $infCServ = ['cTribNac' => '', 'cTribMun' => '', 'xDescServ' => '', 'cNBS' => ''];
 
     // -------------------------------------------------------------------------
-    // Valores (valores)
+    // Valores (valores) — estrutura v1.01: vServPrest + vDescCondIncond? + vDedRed? + trib{tribMun, tribFed?, totTrib}
     // -------------------------------------------------------------------------
 
+    // Tributação ISSQN
+    const TRIB_ISSQN_TRIBUTAVEL  = 1;
+    const TRIB_ISSQN_IMUNIDADE   = 2;
+    const TRIB_ISSQN_EXPORTACAO  = 3;
+    const TRIB_ISSQN_NAO_INCID   = 4;
+
+    // Retenção ISSQN
+    const RET_ISSQN_NAO_RETIDO        = 1;
+    const RET_ISSQN_TOMADOR           = 2;
+    const RET_ISSQN_INTERMEDIARIO     = 3;
+
+    /** @var float Valor dos serviços (R$) — obrigatório */
+    public $infVServ = 0.00;
+
+    /** @var float|null Valor recebido pelo intermediário (R$) — opcional */
+    public $infVReceb = null;
+
+    /** @var float|null Desconto incondicionado (R$) */
+    public $infVDescIncond = null;
+
+    /** @var float|null Desconto condicionado (R$) */
+    public $infVDescCond = null;
+
+    /** @var int Tributação ISSQN: 1=Tributável, 2=Imunidade, 3=Exportação, 4=Não incidência */
+    public $infTribISSQN = self::TRIB_ISSQN_TRIBUTAVEL;
+
+    /** @var int Tipo retenção ISSQN: 1=Não retido, 2=Tomador, 3=Intermediário */
+    public $infTpRetISSQN = self::RET_ISSQN_NAO_RETIDO;
+
+    /** @var float|null Alíquota do ISSQN no município (%). Opcional */
+    public $infPAliq = null;
+
+    /** @var float|null Valor retido INSS/CP (R$) */
+    public $infVRetCP = null;
+
+    /** @var float|null Valor retido IRRF (R$) */
+    public $infVRetIRRF = null;
+
+    /** @var float|null Valor retido CSLL (R$) */
+    public $infVRetCSLL = null;
+
     /**
-     * @var array{vServ: float, vBC: float, pAliqAplic: float, vISSQN: float, vLiq: float,
-     *            descIncond: float, descCond: float, vTotalRet: float,
-     *            vRetIRRF: float, vRetCSLL: float, vRetCP: float}
+     * Indicador para totTrib. Choice do schema; default 0 = "Não informar estimado"
+     * (Decreto 8.264/2014).
+     * @var int
      */
-    public $infValores = [
-        'vServ'     => 0.00,
-        'vBC'       => 0.00,
-        'pAliqAplic' => 0.00,
-        'vISSQN'    => 0.00,
-        'vLiq'      => 0.00,
-        'descIncond' => 0.00,
-        'descCond'  => 0.00,
-        'vTotalRet' => 0.00,
-        'vRetIRRF'  => 0.00,
-        'vRetCSLL'  => 0.00,
-        'vRetCP'    => 0.00,
-    ];
+    public $infIndTotTrib = 0;
 
     // =========================================================================
     // SETTERS — identificação da DPS
@@ -177,7 +234,7 @@ class Rps extends RpsBase
         if (!Validator::digit()->length(1, 5)->validate($value)) {
             throw new InvalidArgumentException("serie deve ter entre 1 e 5 dígitos numéricos. Informado: '$value'");
         }
-        $this->infSerie = str_pad($value, 5, '0', STR_PAD_LEFT);
+        $this->infSerie = ltrim($value, '0') ?: '0';
     }
 
     public function nDps(int $value): void
@@ -210,6 +267,66 @@ class Rps extends RpsBase
             throw new InvalidArgumentException("cLocEmi deve ter exatamente 7 dígitos (código IBGE). Informado: '$value'");
         }
         $this->infCLocEmi = $value;
+    }
+
+    /**
+     * Emissão pelo Tomador/Intermediário (opcional). Obrigatório quando tpEmit=2 ou 3.
+     *
+     * @param int         $cMotivo  1..4 — motivo da emissão
+     * @param string|null $chRej    Chave (50) da NFS-e rejeitada (obrigatório apenas se cMotivo=4)
+     */
+    public function motivoEmisTI(int $cMotivo, ?string $chRej = null): void
+    {
+        if (!Validator::numericVal()->intVal()->between(1, 4)->validate($cMotivo)) {
+            throw new InvalidArgumentException("cMotivoEmisTI deve ser 1..4. Informado: '$cMotivo'");
+        }
+        if ($chRej !== null && !Validator::digit()->length(50, 50)->validate($chRej)) {
+            throw new InvalidArgumentException("chNFSeRej deve ter 50 dígitos. Informado: '$chRej'");
+        }
+        $this->infCMotivoEmisTI = $cMotivo;
+        $this->infChNFSeRej = $chRej;
+    }
+
+    /**
+     * Define a substituição de uma NFS-e existente (grupo subst).
+     *
+     * @param string      $chSubstda Chave (50) da NFS-e a ser substituída
+     * @param string      $cMotivo   Código 01..05 ou 99
+     * @param string|null $xMotivo   Descrição (mín. 15 chars quando informado)
+     */
+    public function substituicao(string $chSubstda, string $cMotivo, ?string $xMotivo = null): void
+    {
+        if (!Validator::digit()->length(50, 50)->validate($chSubstda)) {
+            throw new InvalidArgumentException("chSubstda deve ter 50 dígitos. Informado: '$chSubstda'");
+        }
+        $allowed = ['01', '02', '03', '04', '05', '99'];
+        if (!in_array($cMotivo, $allowed, true)) {
+            throw new InvalidArgumentException("cMotivo de substituição inválido. Informado: '$cMotivo'");
+        }
+        if ($xMotivo !== null && strlen(trim($xMotivo)) < 15) {
+            throw new InvalidArgumentException('xMotivo deve ter no mínimo 15 caracteres quando informado.');
+        }
+        $this->infSubst = [
+            'chSubstda' => $chSubstda,
+            'cMotivo' => $cMotivo,
+            'xMotivo' => $xMotivo ?? '',
+        ];
+    }
+
+    /**
+     * Define dados do intermediário (grupo interm) — opcional.
+     * @param int $tipo 1=CPF, 2=CNPJ
+     */
+    public function intermediario(int $tipo, string $cnpjcpf, string $im, string $xNome, string $fone = '', string $email = ''): void
+    {
+        $this->infIntermediario = [
+            'tipo' => $tipo,
+            'cnpjcpf' => $cnpjcpf,
+            'im' => $im,
+            'xNome' => $xNome,
+            'fone' => $fone,
+            'email' => $email,
+        ];
     }
 
     /**
@@ -343,73 +460,105 @@ class Rps extends RpsBase
     // SETTERS — valores
     // =========================================================================
 
+    /**
+     * Valor dos serviços prestados (R$) — vai em vServPrest/vServ. Obrigatório.
+     */
     public function vServ(float $value): void
     {
         if (!Validator::floatVal()->min(0)->validate($value)) {
-            throw new InvalidArgumentException("vServ deve ser um valor decimal >= 0. Informado: '$value'");
+            throw new InvalidArgumentException("vServ deve ser >= 0. Informado: '$value'");
         }
-        $this->infValores['vServ'] = round($value, 2);
+        $this->infVServ = round($value, 2);
     }
 
-    public function vBC(float $value): void
+    /**
+     * Valor recebido pelo intermediário (R$) — vai em vServPrest/vReceb. Opcional.
+     */
+    public function vReceb(float $value): void
     {
         if (!Validator::floatVal()->min(0)->validate($value)) {
-            throw new InvalidArgumentException("vBC deve ser um valor decimal >= 0. Informado: '$value'");
+            throw new InvalidArgumentException("vReceb deve ser >= 0. Informado: '$value'");
         }
-        $this->infValores['vBC'] = round($value, 2);
+        $this->infVReceb = round($value, 2);
     }
 
-    public function pAliqAplic(float $value): void
+    public function vDescIncond(float $value): void
+    {
+        if ($value > 0) {
+            $this->infVDescIncond = round($value, 2);
+        }
+    }
+
+    public function vDescCond(float $value): void
+    {
+        if ($value > 0) {
+            $this->infVDescCond = round($value, 2);
+        }
+    }
+
+    /**
+     * Tributação ISSQN: 1=Tributável, 2=Imunidade, 3=Exportação, 4=Não incidência.
+     */
+    public function tribISSQN(int $value): void
+    {
+        if (!Validator::numericVal()->intVal()->between(1, 4)->validate($value)) {
+            throw new InvalidArgumentException("tribISSQN deve ser 1..4. Informado: '$value'");
+        }
+        $this->infTribISSQN = $value;
+    }
+
+    /**
+     * Tipo retenção ISSQN: 1=Não retido, 2=Tomador, 3=Intermediário.
+     */
+    public function tpRetISSQN(int $value): void
+    {
+        if (!Validator::numericVal()->intVal()->between(1, 3)->validate($value)) {
+            throw new InvalidArgumentException("tpRetISSQN deve ser 1..3. Informado: '$value'");
+        }
+        $this->infTpRetISSQN = $value;
+    }
+
+    /**
+     * Alíquota do ISSQN (%) — opcional. Se o município estiver no ADN, a alíquota é
+     * parametrizada e pode ser omitida. Informe quando o município não estiver no ADN.
+     */
+    public function pAliq(float $value): void
     {
         if (!Validator::floatVal()->min(0)->validate($value)) {
-            throw new InvalidArgumentException("pAliqAplic deve ser um valor decimal >= 0. Informado: '$value'");
+            throw new InvalidArgumentException("pAliq deve ser >= 0. Informado: '$value'");
         }
-        $this->infValores['pAliqAplic'] = round($value, 4);
-    }
-
-    public function vISSQN(float $value): void
-    {
-        if (!Validator::floatVal()->min(0)->validate($value)) {
-            throw new InvalidArgumentException("vISSQN deve ser um valor decimal >= 0. Informado: '$value'");
-        }
-        $this->infValores['vISSQN'] = round($value, 2);
-    }
-
-    public function vLiq(float $value): void
-    {
-        if (!Validator::floatVal()->min(0)->validate($value)) {
-            throw new InvalidArgumentException("vLiq deve ser um valor decimal >= 0. Informado: '$value'");
-        }
-        $this->infValores['vLiq'] = round($value, 2);
-    }
-
-    public function descIncond(float $value): void
-    {
-        $this->infValores['descIncond'] = round($value, 2);
-    }
-
-    public function descCond(float $value): void
-    {
-        $this->infValores['descCond'] = round($value, 2);
-    }
-
-    public function vTotalRet(float $value): void
-    {
-        $this->infValores['vTotalRet'] = round($value, 2);
-    }
-
-    public function vRetIRRF(float $value): void
-    {
-        $this->infValores['vRetIRRF'] = round($value, 2);
-    }
-
-    public function vRetCSLL(float $value): void
-    {
-        $this->infValores['vRetCSLL'] = round($value, 2);
+        $this->infPAliq = round($value, 2);
     }
 
     public function vRetCP(float $value): void
     {
-        $this->infValores['vRetCP'] = round($value, 2);
+        if ($value > 0) {
+            $this->infVRetCP = round($value, 2);
+        }
+    }
+
+    public function vRetIRRF(float $value): void
+    {
+        if ($value > 0) {
+            $this->infVRetIRRF = round($value, 2);
+        }
+    }
+
+    public function vRetCSLL(float $value): void
+    {
+        if ($value > 0) {
+            $this->infVRetCSLL = round($value, 2);
+        }
+    }
+
+    /**
+     * Indicador do grupo totTrib — usar 0 para "não informar estimado" (Decreto 8.264/2014).
+     */
+    public function indTotTrib(int $value): void
+    {
+        if ($value !== 0) {
+            throw new InvalidArgumentException('indTotTrib suportado atualmente apenas com valor 0. Para vTotTrib/pTotTrib/pTotTribSN use setters específicos (futuro).');
+        }
+        $this->infIndTotTrib = 0;
     }
 }

@@ -156,9 +156,13 @@
     </xs:restriction>
   </xs:simpleType>
   <xs:simpleType name="TSSerieDPS">
+    <!-- Pattern original do XSD oficial: "^0{0,4}\d{1,5}$".
+         XML Schema regex não suporta âncoras "^" e "$" como no PCRE; esses caracteres
+         são tratados como literais, tornando o pattern original inviável.
+         Correção local: remoção das âncoras para refletir a intenção (1..5 dígitos). -->
     <xs:restriction base="xs:string">
       <xs:maxLength value="5"/>
-      <xs:pattern value="^0{0,4}\d{1,5}$"/>
+      <xs:pattern value="0{0,4}\d{1,5}"/>
       <xs:whiteSpace value="preserve"/>
     </xs:restriction>
   </xs:simpleType>
