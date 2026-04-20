@@ -113,7 +113,7 @@ class RenderRps
         $dom->addChild($regTrib, 'opSimpNac', $rps->infRegTrib['opSimpNac'], true, 'Opção Simples Nacional', false);
         $dom->addChild($regTrib, 'regEspTrib', $rps->infRegTrib['regEspTrib'], true, 'Regime Especial Tributação', false);
 
-        // ── Tomador (opcional) ───────────────────────────────────────────────
+        // ── Tomador (opcional) — ordem TCInfoPessoa: CNPJ|CPF → IM? → xNome → end? → fone? → email? ───
         if (!empty($rps->infTomador['cnpjcpf']) || !empty($rps->infTomador['xNome'])) {
             $toma = $dom->createElement('toma');
             $dom->appChild($infDPS, $toma, 'Adicionando toma');
@@ -134,17 +134,16 @@ class RenderRps
                 $dom->addChild($toma, 'xNome', $rps->infTomador['xNome'], true, 'Nome Tomador', false);
             }
 
-            if (!empty($rps->infTomador['fone'])) {
-                $dom->addChild($toma, 'fone', $rps->infTomador['fone'], false, 'Telefone Tomador', false);
-            }
-
-            if (!empty($rps->infTomador['email'])) {
-                $dom->addChild($toma, 'email', $rps->infTomador['email'], false, 'E-mail Tomador', false);
-            }
-
+            // Endereço nacional — TCEndereco: <endNac><cMun/><CEP/></endNac><xLgr><nro><xCpl>?<xBairro>
             if (!empty($rps->infTomadorEndereco['xLgr'])) {
                 $end = $dom->createElement('end');
                 $dom->appChild($toma, $end, 'Adicionando end tomador');
+
+                $endNac = $dom->createElement('endNac');
+                $dom->appChild($end, $endNac, 'Adicionando endNac');
+                $dom->addChild($endNac, 'cMun', $rps->infTomadorEndereco['cMun'], true, 'Código IBGE', false);
+                $dom->addChild($endNac, 'CEP', $rps->infTomadorEndereco['CEP'], true, 'CEP', false);
+
                 $dom->addChild($end, 'xLgr', $rps->infTomadorEndereco['xLgr'], true, 'Logradouro', false);
                 $dom->addChild($end, 'nro', $rps->infTomadorEndereco['nro'], true, 'Número', false);
 
@@ -153,9 +152,14 @@ class RenderRps
                 }
 
                 $dom->addChild($end, 'xBairro', $rps->infTomadorEndereco['xBairro'], true, 'Bairro', false);
-                $dom->addChild($end, 'cMun', $rps->infTomadorEndereco['cMun'], true, 'Código IBGE', false);
-                $dom->addChild($end, 'UF', $rps->infTomadorEndereco['UF'], true, 'UF', false);
-                $dom->addChild($end, 'CEP', $rps->infTomadorEndereco['CEP'], true, 'CEP', false);
+            }
+
+            if (!empty($rps->infTomador['fone'])) {
+                $dom->addChild($toma, 'fone', $rps->infTomador['fone'], false, 'Telefone Tomador', false);
+            }
+
+            if (!empty($rps->infTomador['email'])) {
+                $dom->addChild($toma, 'email', $rps->infTomador['email'], false, 'E-mail Tomador', false);
             }
         }
 
