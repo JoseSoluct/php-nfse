@@ -24,6 +24,10 @@ class RenderRps
 
     /**
      * Gera o XML assinado de uma DPS (SHA-256, XMLDSIG).
+     *
+     * O Signer do nfephp-common emite o XML com LIBXML_NOXMLDECL (sem prólogo),
+     * padrão herdado do ABRASF/NFe. O Sefin Nacional exige a declaração XML com
+     * encoding UTF-8 (rejeita com E1229), então reintroduzimos o prólogo aqui.
      */
     public static function toXml(
         Rps $rps,
@@ -35,7 +39,7 @@ class RenderRps
 
         $xml = self::render($rps);
 
-        return Signer::sign(
+        $signed = Signer::sign(
             self::$certificate,
             $xml,
             'infDPS',
@@ -43,6 +47,8 @@ class RenderRps
             self::$algorithm,
             [false, false, null, null]
         );
+
+        return '<?xml version="1.0" encoding="UTF-8"?>' . $signed;
     }
 
     /**

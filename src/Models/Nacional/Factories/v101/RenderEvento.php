@@ -32,6 +32,9 @@ class RenderEvento
 
     /**
      * Gera o XML assinado do pedido de registro de evento.
+     *
+     * Reintroduz o prólogo XML após a assinatura (Signer::sign usa LIBXML_NOXMLDECL),
+     * pois o Sefin Nacional rejeita XML sem declaração de encoding (E1229).
      */
     public static function toXml(
         Evento $evento,
@@ -40,7 +43,7 @@ class RenderEvento
     ): string {
         $xml = self::render($evento);
 
-        return Signer::sign(
+        $signed = Signer::sign(
             $certificate,
             $xml,
             'infPedReg',
@@ -48,6 +51,8 @@ class RenderEvento
             $algorithm,
             [false, false, null, null]
         );
+
+        return '<?xml version="1.0" encoding="UTF-8"?>' . $signed;
     }
 
     /**
