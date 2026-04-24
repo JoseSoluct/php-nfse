@@ -266,8 +266,6 @@ class RenderRps
         $dom->appChild($trib, $totTrib, 'Adicionando totTrib');
         $dom->addChild($totTrib, 'indTotTrib', (string) $rps->infIndTotTrib, true, 'Indicador total tributos', false);
 
-        $xml = $dom->saveXML();
-
-        return str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $xml);
+        return $dom->saveXML();
     }
 }

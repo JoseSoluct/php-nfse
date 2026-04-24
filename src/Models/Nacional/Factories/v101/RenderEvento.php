@@ -85,9 +85,7 @@ class RenderEvento
 
         self::appendPayload($dom, $eventoNode, $evento);
 
-        $xml = $dom->saveXML();
-
-        return str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $xml);
+        return $dom->saveXML();
     }
 
     /**

@@ -76,15 +76,17 @@ class Response
         }
 
         // Erro (NFSePostResponseErro): propaga lista de mensagens para cStat/xMotivo.
+        // O swagger documenta keys em lowercase, mas o servidor atual envia em PascalCase
+        // (Codigo/Descricao/Complemento). Aceitamos ambas as variantes.
         if (!empty($data->erros) && is_array($data->erros)) {
             foreach ($data->erros as $err) {
                 if (!is_object($err)) {
                     continue;
                 }
                 $result->erros[] = (object) [
-                    'codigo' => (string) ($err->codigo ?? ''),
-                    'descricao' => (string) ($err->descricao ?? ''),
-                    'complemento' => (string) ($err->complemento ?? ''),
+                    'codigo' => (string) ($err->codigo ?? $err->Codigo ?? ''),
+                    'descricao' => (string) ($err->descricao ?? $err->Descricao ?? ''),
+                    'complemento' => (string) ($err->complemento ?? $err->Complemento ?? ''),
                 ];
             }
 
