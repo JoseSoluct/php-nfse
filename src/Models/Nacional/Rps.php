@@ -98,32 +98,63 @@ class Rps extends RpsBase
     /**
      * Intermediário (grupo opcional) — mesma estrutura de tomador.
      *
-     * @var array{tipo: int, cnpjcpf: string, im: string, xNome: string, fone: string, email: string}|null
+     * @var array{tipo: int|string, cnpjcpf: string, caepf: string, im: string, xNome: string, fone: string, email: string}|null
      */
     public $infIntermediario = null;
+
+    /**
+     * Endereço do intermediário (opcional).
+     * @var array{xLgr: string, nro: string, xCpl: string, xBairro: string, cMun: string, UF: string, CEP: string}|null
+     */
+    public $infIntermediarioEndereco = null;
 
     // -------------------------------------------------------------------------
     // Prestador (prest)
     // -------------------------------------------------------------------------
 
     /**
-     * @var array{tipo: int, cnpjcpf: string, im: string, xNome: string}
+     * Dados do prestador. `tipo` usa TCInfoPrestador (choice entre CNPJ/CPF/NIF/cNaoNIF).
+     * `tipo` 1=CPF, 2=CNPJ, 3=NIF, 4=cNaoNIF (pessoa estrangeira não-NIF).
+     * @var array{tipo: int|string, cnpjcpf: string, caepf: string, im: string, xNome: string, fone: string, email: string}
      */
-    public $infPrestador = ['tipo' => '', 'cnpjcpf' => '', 'im' => '', 'xNome' => ''];
+    public $infPrestador = [
+        'tipo'    => '',
+        'cnpjcpf' => '',
+        'caepf'   => '',
+        'im'      => '',
+        'xNome'   => '',
+        'fone'    => '',
+        'email'   => '',
+    ];
 
     /**
-     * @var array{opSimpNac: int, regEspTrib: int}
+     * Endereço nacional do prestador (opcional). Mesma estrutura do tomador.
+     * @var array{xLgr: string, nro: string, xCpl: string, xBairro: string, cMun: string, UF: string, CEP: string}|null
      */
-    public $infRegTrib = ['opSimpNac' => '', 'regEspTrib' => ''];
+    public $infPrestadorEndereco = null;
+
+    /**
+     * @var array{opSimpNac: int, regApTribSN: ?int, regEspTrib: int}
+     */
+    public $infRegTrib = ['opSimpNac' => '', 'regApTribSN' => null, 'regEspTrib' => ''];
 
     // -------------------------------------------------------------------------
     // Tomador (toma) — opcional
     // -------------------------------------------------------------------------
 
     /**
-     * @var array{tipo: int, cnpjcpf: string, im: string, xNome: string, fone: string, email: string}
+     * Dados do tomador. `tipo` usa choice TCInfoPessoa (CNPJ/CPF/NIF/cNaoNIF).
+     * @var array{tipo: int|string, cnpjcpf: string, caepf: string, im: string, xNome: string, fone: string, email: string}
      */
-    public $infTomador = ['tipo' => '', 'cnpjcpf' => '', 'im' => '', 'xNome' => '', 'fone' => '', 'email' => ''];
+    public $infTomador = [
+        'tipo'    => '',
+        'cnpjcpf' => '',
+        'caepf'   => '',
+        'im'      => '',
+        'xNome'   => '',
+        'fone'    => '',
+        'email'   => '',
+    ];
 
     /**
      * @var array{xLgr: string, nro: string, xCpl: string, xBairro: string, cMun: string, UF: string, CEP: string}
@@ -188,6 +219,32 @@ class Rps extends RpsBase
     /** @var float|null Alíquota do ISSQN no município (%). Opcional */
     public $infPAliq = null;
 
+    /**
+     * Código ISO do país onde se verificou o resultado do serviço exportado.
+     * Obrigatório quando `tribISSQN` = 3 (Exportação).
+     * @var string|null
+     */
+    public $infCPaisResult = null;
+
+    /**
+     * Tipo de imunidade do ISSQN. Obrigatório quando `tribISSQN` = 2 (Imunidade).
+     * 1..5 conforme TCTribMunicipal/tpImunidade.
+     * @var int|null
+     */
+    public $infTpImunidade = null;
+
+    /**
+     * Exigibilidade suspensa do ISSQN (judicial/administrativa).
+     * @var array{tpSusp: int, nProcesso: string}|null
+     */
+    public $infExigSusp = null;
+
+    /**
+     * Benefício municipal parametrizado (redução de BC).
+     * @var array{nBM: string, vRedBCBM: ?float, pRedBCBM: ?float}|null
+     */
+    public $infBM = null;
+
     /** @var float|null Valor retido INSS/CP (R$) */
     public $infVRetCP = null;
 
@@ -198,11 +255,48 @@ class Rps extends RpsBase
     public $infVRetCSLL = null;
 
     /**
+     * Grupo PIS/COFINS dentro de tribFed (TCTribOutrosPisCofins).
+     * Ordem: CST → vBCPisCofins → pAliqPis → pAliqCofins → vPis → vCofins → tpRetPisCofins.
+     *
+     * @var array{
+     *   CST: string,
+     *   vBC: ?float,
+     *   pAliqPis: ?float,
+     *   pAliqCofins: ?float,
+     *   vPis: ?float,
+     *   vCofins: ?float,
+     *   tpRet: ?int
+     * }|null
+     */
+    public $infPisCofins = null;
+
+    /**
      * Indicador para totTrib. Choice do schema; default 0 = "Não informar estimado"
-     * (Decreto 8.264/2014).
-     * @var int
+     * (Decreto 8.264/2014). `null` suprime o bloco `<totTrib>` inteiro — obrigatório
+     * para SN ME/EPP e MEI, que não podem informar este campo (E0712).
+     * @var int|null
      */
     public $infIndTotTrib = 0;
+
+    /**
+     * Valores monetários totais aproximados dos tributos (Lei 12.741/2012).
+     * Alternativa ao `indTotTrib`; o schema exige os 3 campos quando presente.
+     * @var array{fed: float, est: float, mun: float}|null
+     */
+    public $infVTotTrib = null;
+
+    /**
+     * Percentuais totais aproximados dos tributos (Lei 12.741/2012).
+     * @var array{fed: float, est: float, mun: float}|null
+     */
+    public $infPTotTrib = null;
+
+    /**
+     * Percentual total aproximado da alíquota do Simples Nacional (%).
+     * Alternativa específica para optantes do SN — simpleType.
+     * @var float|null
+     */
+    public $infPTotTribSN = null;
 
     // =========================================================================
     // SETTERS — identificação da DPS
@@ -317,15 +411,39 @@ class Rps extends RpsBase
      * Define dados do intermediário (grupo interm) — opcional.
      * @param int $tipo 1=CPF, 2=CNPJ
      */
-    public function intermediario(int $tipo, string $cnpjcpf, string $im, string $xNome, string $fone = '', string $email = ''): void
-    {
+    public function intermediario(
+        int $tipo,
+        string $cnpjcpf,
+        string $im,
+        string $xNome,
+        string $fone = '',
+        string $email = '',
+        string $caepf = ''
+    ): void {
         $this->infIntermediario = [
-            'tipo' => $tipo,
+            'tipo'    => $tipo,
             'cnpjcpf' => $cnpjcpf,
-            'im' => $im,
-            'xNome' => $xNome,
-            'fone' => $fone,
-            'email' => $email,
+            'caepf'   => $caepf,
+            'im'      => $im,
+            'xNome'   => $xNome,
+            'fone'    => $fone,
+            'email'   => $email,
+        ];
+    }
+
+    /**
+     * Define endereço nacional do intermediário.
+     */
+    public function intermediarioEndereco(string $xLgr, string $nro, string $xBairro, string $cMun, string $uf, string $cep, string $xCpl = ''): void
+    {
+        $this->infIntermediarioEndereco = [
+            'xLgr'    => $xLgr,
+            'nro'     => $nro,
+            'xCpl'    => $xCpl,
+            'xBairro' => $xBairro,
+            'cMun'    => $cMun,
+            'UF'      => $uf,
+            'CEP'     => $cep,
         ];
     }
 
@@ -350,24 +468,58 @@ class Rps extends RpsBase
 
     /**
      * Define dados do prestador de serviço.
-     * @param int $tipo 1=CPF, 2=CNPJ
+     * @param int    $tipo    1=CPF, 2=CNPJ, 3=NIF (estrangeiro), 4=cNaoNIF
+     * @param string $cnpjcpf CNPJ/CPF/NIF ou código cNaoNIF (0/1/2) conforme o tipo
+     * @param string $im      Inscrição Municipal
+     * @param string $xNome   Razão Social
+     * @param string $fone    Telefone (opcional)
+     * @param string $email   E-mail (opcional)
+     * @param string $caepf   CAEPF (opcional, produtor rural PF)
      */
-    public function prestador(int $tipo, string $cnpjcpf, string $im, string $xNome): void
-    {
+    public function prestador(
+        int $tipo,
+        string $cnpjcpf,
+        string $im,
+        string $xNome,
+        string $fone = '',
+        string $email = '',
+        string $caepf = ''
+    ): void {
         $this->infPrestador = [
             'tipo'    => $tipo,
             'cnpjcpf' => $cnpjcpf,
+            'caepf'   => $caepf,
             'im'      => $im,
             'xNome'   => $xNome,
+            'fone'    => $fone,
+            'email'   => $email,
+        ];
+    }
+
+    /**
+     * Define endereço nacional do prestador (opcional).
+     */
+    public function prestadorEndereco(string $xLgr, string $nro, string $xBairro, string $cMun, string $uf, string $cep, string $xCpl = ''): void
+    {
+        $this->infPrestadorEndereco = [
+            'xLgr'    => $xLgr,
+            'nro'     => $nro,
+            'xCpl'    => $xCpl,
+            'xBairro' => $xBairro,
+            'cMun'    => $cMun,
+            'UF'      => $uf,
+            'CEP'     => $cep,
         ];
     }
 
     /**
      * Define o regime tributário do prestador.
-     * @param int $opSimpNac 1=Não optante, 2=MEI, 3=ME/EPP
-     * @param int $regEspTrib 0=Nenhum, 1-6, 9=Outros
+     * @param int      $opSimpNac   1=Não optante, 2=MEI, 3=ME/EPP
+     * @param int      $regEspTrib  0=Nenhum, 1-6, 9=Outros
+     * @param int|null $regApTribSN Regime de apuração do SN (obrigatório para ME/EPP):
+     *                              1=Competência, 2=Caixa
      */
-    public function regimeTributacao(int $opSimpNac, int $regEspTrib): void
+    public function regimeTributacao(int $opSimpNac, int $regEspTrib, ?int $regApTribSN = null): void
     {
         if (!Validator::numericVal()->intVal()->between(1, 3)->validate($opSimpNac)) {
             throw new InvalidArgumentException("opSimpNac deve ser 1, 2 ou 3. Informado: '$opSimpNac'");
@@ -376,9 +528,13 @@ class Rps extends RpsBase
         if (!in_array($regEspTrib, $allowedRegimes, true)) {
             throw new InvalidArgumentException("regEspTrib deve ser 0-6 ou 9. Informado: '$regEspTrib'");
         }
+        if ($regApTribSN !== null && !in_array($regApTribSN, [1, 2], true)) {
+            throw new InvalidArgumentException("regApTribSN deve ser 1 (Competência) ou 2 (Caixa). Informado: '$regApTribSN'");
+        }
         $this->infRegTrib = [
-            'opSimpNac'  => $opSimpNac,
-            'regEspTrib' => $regEspTrib,
+            'opSimpNac'   => $opSimpNac,
+            'regApTribSN' => $regApTribSN,
+            'regEspTrib'  => $regEspTrib,
         ];
     }
 
@@ -388,13 +544,21 @@ class Rps extends RpsBase
 
     /**
      * Define dados do tomador de serviço.
-     * @param int $tipo 1=CPF, 2=CNPJ
+     * @param int $tipo 1=CPF, 2=CNPJ, 3=NIF, 4=cNaoNIF
      */
-    public function tomador(int $tipo, string $cnpjcpf, string $im, string $xNome, string $fone = '', string $email = ''): void
-    {
+    public function tomador(
+        int $tipo,
+        string $cnpjcpf,
+        string $im,
+        string $xNome,
+        string $fone = '',
+        string $email = '',
+        string $caepf = ''
+    ): void {
         $this->infTomador = [
             'tipo'    => $tipo,
             'cnpjcpf' => $cnpjcpf,
+            'caepf'   => $caepf,
             'im'      => $im,
             'xNome'   => $xNome,
             'fone'    => $fone,
@@ -552,13 +716,129 @@ class Rps extends RpsBase
     }
 
     /**
+     * Define o país de resultado do serviço exportado (ISO, 2-3 dígitos).
+     * Obrigatório quando tribISSQN=3 (Exportação).
+     */
+    public function cPaisResult(string $isoCode): void
+    {
+        $this->infCPaisResult = $isoCode;
+    }
+
+    /**
+     * Define o tipo de imunidade do ISSQN (1..5).
+     * Obrigatório quando tribISSQN=2 (Imunidade).
+     */
+    public function tpImunidade(int $value): void
+    {
+        if (!Validator::numericVal()->intVal()->between(0, 5)->validate($value)) {
+            throw new InvalidArgumentException("tpImunidade deve ser 0..5. Informado: '$value'");
+        }
+        $this->infTpImunidade = $value;
+    }
+
+    /**
+     * Define a exigibilidade suspensa do ISSQN.
+     * @param int    $tpSusp    1=Judicial, 2=Administrativo
+     * @param string $nProcesso Número do processo
+     */
+    public function exigSusp(int $tpSusp, string $nProcesso): void
+    {
+        if (!in_array($tpSusp, [1, 2], true)) {
+            throw new InvalidArgumentException("tpSusp deve ser 1 (Judicial) ou 2 (Administrativo).");
+        }
+        $this->infExigSusp = ['tpSusp' => $tpSusp, 'nProcesso' => $nProcesso];
+    }
+
+    /**
+     * Define benefício municipal parametrizado (redução BC). Informe somente um
+     * entre `vRedBCBM` e `pRedBCBM`.
+     */
+    public function beneficioMunicipal(string $nBM, ?float $vRedBCBM = null, ?float $pRedBCBM = null): void
+    {
+        $this->infBM = [
+            'nBM' => $nBM,
+            'vRedBCBM' => $vRedBCBM !== null ? round($vRedBCBM, 2) : null,
+            'pRedBCBM' => $pRedBCBM !== null ? round($pRedBCBM, 2) : null,
+        ];
+    }
+
+    /**
+     * Define o grupo PIS/COFINS (tribFed/piscofins).
+     * @param string     $cst         Código de Situação Tributária PIS/COFINS (TSTipoCST)
+     * @param float|null $vBC         Valor base de cálculo (R$)
+     * @param float|null $pAliqPis    Alíquota PIS (%)
+     * @param float|null $pAliqCofins Alíquota COFINS (%)
+     * @param float|null $vPis        Valor PIS (R$)
+     * @param float|null $vCofins     Valor COFINS (R$)
+     * @param int|null   $tpRet       Tipo de retenção PIS/COFINS (TSTipoRetPISCofins)
+     */
+    public function pisCofins(
+        string $cst,
+        ?float $vBC = null,
+        ?float $pAliqPis = null,
+        ?float $pAliqCofins = null,
+        ?float $vPis = null,
+        ?float $vCofins = null,
+        ?int $tpRet = null
+    ): void {
+        $this->infPisCofins = [
+            'CST'         => $cst,
+            'vBC'         => $vBC !== null ? round($vBC, 2) : null,
+            'pAliqPis'    => $pAliqPis !== null ? round($pAliqPis, 2) : null,
+            'pAliqCofins' => $pAliqCofins !== null ? round($pAliqCofins, 2) : null,
+            'vPis'        => $vPis !== null ? round($vPis, 2) : null,
+            'vCofins'     => $vCofins !== null ? round($vCofins, 2) : null,
+            'tpRet'       => $tpRet,
+        ];
+    }
+
+    /**
      * Indicador do grupo totTrib — usar 0 para "não informar estimado" (Decreto 8.264/2014).
      */
     public function indTotTrib(int $value): void
     {
         if ($value !== 0) {
-            throw new InvalidArgumentException('indTotTrib suportado atualmente apenas com valor 0. Para vTotTrib/pTotTrib/pTotTribSN use setters específicos (futuro).');
+            throw new InvalidArgumentException('indTotTrib suportado atualmente apenas com valor 0.');
         }
         $this->infIndTotTrib = 0;
+        $this->infVTotTrib = null;
+        $this->infPTotTrib = null;
+        $this->infPTotTribSN = null;
+    }
+
+    /**
+     * Define os valores monetários totais aproximados de tributos (Lei 12.741/2012).
+     * O schema exige os 3 campos (federal, estadual, municipal) quando presente.
+     */
+    public function vTotTrib(float $fed, float $est = 0.0, float $mun = 0.0): void
+    {
+        $this->infVTotTrib = ['fed' => $fed, 'est' => $est, 'mun' => $mun];
+        $this->infIndTotTrib = null;
+        $this->infPTotTrib = null;
+        $this->infPTotTribSN = null;
+    }
+
+    /**
+     * Define os percentuais totais aproximados de tributos (Lei 12.741/2012).
+     * O schema exige os 3 campos (federal, estadual, municipal) quando presente.
+     */
+    public function pTotTrib(float $fed, float $est = 0.0, float $mun = 0.0): void
+    {
+        $this->infPTotTrib = ['fed' => $fed, 'est' => $est, 'mun' => $mun];
+        $this->infIndTotTrib = null;
+        $this->infVTotTrib = null;
+        $this->infPTotTribSN = null;
+    }
+
+    /**
+     * Define o percentual total aproximado da alíquota do Simples Nacional (%).
+     * Específico para optantes do SN — simpleType no schema.
+     */
+    public function pTotTribSN(float $value): void
+    {
+        $this->infPTotTribSN = $value;
+        $this->infIndTotTrib = null;
+        $this->infVTotTrib = null;
+        $this->infPTotTrib = null;
     }
 }
