@@ -8,7 +8,7 @@ use NFePHP\NFSe\Models\Nacional\Factories\v101\RenderEvento;
 use RuntimeException;
 
 /**
- * Cliente REST do Ambiente de Dados Nacional (ADN) da NFS-e.
+ * Cliente REST do ambiente nacional da NFS-e (Sefin Nacional + ADN).
  *
  * Protocolo oficial (gov.br/nfse):
  *   - mTLS com certificado ICP-Brasil A1/A3
@@ -16,16 +16,18 @@ use RuntimeException;
  *     compactados via GZip e codificados em Base64 no campo correspondente.
  *   - Resposta em JSON contendo o XML da NFS-e/Evento também em GZip+Base64.
  *
- * Endpoints (concat. ao host por ambiente):
- *   POST  /nfse                         → recepção de DPS (resposta síncrona com NFS-e)
- *   GET   /nfse/{chaveAcesso}           → consulta NFS-e emitida
- *   GET   /dps/{id}                     → consulta DPS enviada
- *   HEAD  /dps/{id}                     → verifica se DPS virou NFS-e
- *   POST  /nfse/{chaveAcesso}/eventos   → registra evento (cancelamento, substituição, …)
- *   GET   /nfse/{chaveAcesso}/eventos   → lista eventos da NFS-e
- *   GET   /danfse/{chaveAcesso}         → download do DANFSe em PDF (binário)
- *   GET   /DFe/{nsu}                    → distribuição DFe (NFS-e onde a empresa é tomadora)
- *   GET   /parametros_municipais/{ibge}/{grupo}
+ * Sefin Nacional (host `sefin.*.nfse.gov.br`, basePath `/SefinNacional`):
+ *   POST  /nfse                              → recepção de DPS (resposta síncrona com NFS-e)
+ *   GET   /nfse/{chaveAcesso}                → consulta NFS-e emitida
+ *   POST  /nfse/{chaveAcesso}/eventos        → registra evento (cancelamento, substituição, …)
+ *   GET   /nfse/{chaveAcesso}/eventos/{t}/{s}→ consulta evento específico
+ *   GET   /dps/{id}                          → consulta DPS enviada
+ *   HEAD  /dps/{id}                          → verifica se DPS virou NFS-e
+ *
+ * ADN — serviços migrados (host `adn.*.nfse.gov.br`):
+ *   GET   /danfse/{chaveAcesso}              → DANFSe em PDF (a confirmar path exato)
+ *   GET   /contribuintes/DFe/{nsu}           → distribuição DFe (a confirmar)
+ *   GET   /parametrizacao/{ibge}/{grupo}     → parâmetros municipais (a confirmar)
  */
 class Tools extends ToolsBase
 {
@@ -48,9 +50,28 @@ class Tools extends ToolsBase
      *
      * @var array<int, string>
      */
+    /**
+     * Sefin Nacional — recepção de DPS, consultas de NFS-e/DPS e eventos.
+     * O swagger oficial define basePath `/SefinNacional`, já incluído aqui.
+     *
+     * Observação: DANFSe, ParâmetrosMunicipais e distribuição DFe migraram
+     * para o domínio `adn.*.nfse.gov.br` (ver métodos correspondentes).
+     */
     protected $url = [
-        1 => 'https://sefin.nfse.gov.br',              // Produção
-        2 => 'https://sefin.producaorestrita.nfse.gov.br', // Homologação (produção restrita)
+        1 => 'https://sefin.nfse.gov.br/SefinNacional',              // Produção
+        2 => 'https://sefin.producaorestrita.nfse.gov.br/SefinNacional', // Homologação (produção restrita)
+    ];
+
+    /**
+     * ADN (Ambiente de Dados Nacional) — hosts dos serviços migrados
+     * (DANFSe em `/danfse`, parâmetros municipais em `/parametrizacao`,
+     * distribuição DFe em `/contribuintes`).
+     *
+     * @var array<int, string>
+     */
+    protected array $adnUrl = [
+        1 => 'https://adn.nfse.gov.br',
+        2 => 'https://adn.producaorestrita.nfse.gov.br',
     ];
 
     /**
@@ -62,7 +83,7 @@ class Tools extends ToolsBase
     }
 
     /**
-     * Retorna o host base conforme ambiente configurado em $config->tpAmb.
+     * Retorna o host base do Sefin Nacional (inclui basePath `/SefinNacional`).
      */
     protected function baseUrl(): string
     {
@@ -71,6 +92,23 @@ class Tools extends ToolsBase
 
         if (empty($base)) {
             throw new RuntimeException("Ambiente inválido para NFS-e Nacional: {$tpAmb}");
+        }
+
+        return $base;
+    }
+
+    /**
+     * Retorna o host do ADN (Ambiente de Dados Nacional) conforme ambiente.
+     * Usado para serviços migrados para fora do Sefin Nacional: DANFSe,
+     * parâmetros municipais e distribuição DFe.
+     */
+    protected function adnBaseUrl(): string
+    {
+        $tpAmb = (int) ($this->config->tpAmb ?? 2);
+        $base = $this->adnUrl[$tpAmb] ?? null;
+
+        if (empty($base)) {
+            throw new RuntimeException("Ambiente inválido para ADN: {$tpAmb}");
         }
 
         return $base;
@@ -230,7 +268,8 @@ class Tools extends ToolsBase
 
     /**
      * Baixa o PDF oficial do DANFSe pela chave de acesso.
-     * Retorna os bytes do PDF (binário).
+     * Serviço migrado do Sefin Nacional para o ADN (host `adn.*.nfse.gov.br`,
+     * path base `/danfse`). Paths específicos a confirmar com o swagger ADN.
      */
     public function baixarDanfse(string $chaveAcesso): string
     {
@@ -238,7 +277,7 @@ class Tools extends ToolsBase
 
         return $this->httpRequest(
             'GET',
-            $this->baseUrl() . '/danfse/' . rawurlencode($chaveAcesso),
+            $this->adnBaseUrl() . '/danfse/' . rawurlencode($chaveAcesso),
             null,
             null,
             'application/pdf'
@@ -247,6 +286,8 @@ class Tools extends ToolsBase
 
     /**
      * Distribuição DFe: retorna NFS-e onde a empresa é tomadora, a partir de um NSU.
+     * Serviço do ADN (host `adn.*.nfse.gov.br`). Path sujeito a confirmação com
+     * o swagger oficial (normalmente sob `/contribuintes/DFe/{nsu}`).
      */
     public function distribuicaoDFe(int $nsu): string
     {
@@ -256,12 +297,13 @@ class Tools extends ToolsBase
 
         return $this->httpRequest(
             'GET',
-            $this->baseUrl() . '/DFe/' . $nsu
+            $this->adnBaseUrl() . '/contribuintes/DFe/' . $nsu
         );
     }
 
     /**
      * Consulta parâmetros municipais (alíquotas, códigos, etc.) por município e grupo.
+     * Serviço migrado para ADN em `/parametrizacao`. Path sujeito a confirmação.
      */
     public function consultarParametrosMunicipais(string $codigoIbge, string $grupo): string
     {
@@ -271,7 +313,7 @@ class Tools extends ToolsBase
 
         return $this->httpRequest(
             'GET',
-            $this->baseUrl() . '/parametros_municipais/' . $codigoIbge . '/' . rawurlencode($grupo)
+            $this->adnBaseUrl() . '/parametrizacao/' . $codigoIbge . '/' . rawurlencode($grupo)
         );
     }
 
@@ -367,7 +409,24 @@ class Tools extends ToolsBase
             throw new RuntimeException("ADN retornou HTTP {$httpCode}: " . substr((string) $response, 0, 500));
         }
 
+        // 4xx com body não-JSON normalmente indica path/host incorreto ou falha
+        // de autenticação mTLS antes de chegar no app (404 IIS, 496, etc.).
+        // Erros de negócio do Sefin Nacional vêm com Content-Type application/json
+        // (NFSePostResponseErro), e devem ser parseados normalmente pelo chamador.
+        if ($httpCode >= 400 && ! $this->looksLikeJson((string) $response)) {
+            throw new RuntimeException(
+                "Sefin Nacional retornou HTTP {$httpCode} em {$url}: "
+                . substr((string) $response, 0, 300)
+            );
+        }
+
         return (string) $response;
+    }
+
+    private function looksLikeJson(string $body): bool
+    {
+        $trimmed = ltrim($body);
+        return isset($trimmed[0]) && ($trimmed[0] === '{' || $trimmed[0] === '[');
     }
 
     /**
