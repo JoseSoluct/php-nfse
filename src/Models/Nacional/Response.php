@@ -23,15 +23,24 @@ class Response
     /**
      * Parseia a resposta de emissão de NFS-e (POST /nfse).
      *
+     * Aceita os dois esquemas do Sefin Nacional:
+     *  - Sucesso (HTTP 201, NFSePostResponseSucesso):
+     *      {tipoAmbiente, versaoAplicativo, dataHoraProcessamento, idDps,
+     *       chaveAcesso, nfseXmlGZipB64, alertas?}
+     *  - Erro (HTTP 4xx, NFSePostResponseErro):
+     *      {tipoAmbiente, versaoAplicativo, dataHoraProcessamento, idDPS?,
+     *       erros: [{codigo, descricao, complemento}]}
+     *
      * Retorna stdClass com:
-     *   - chaveAcesso          (string 50) — TSChaveNFSe
-     *   - idNFSe               (string 53) — TSIdNFSe
-     *   - numero               (string)   — nNFSe
-     *   - cStat                (int)      — status do processamento (100 = gerada)
-     *   - xMotivo              (string)   — mensagem descritiva
-     *   - dhProc               (string)   — data/hora processamento (UTC ISO-8601)
+     *   - chaveAcesso          (string 50)
+     *   - idNFSe               (string 53)
+     *   - numero               (string)   — nNFSe extraído do XML
+     *   - cStat                (int)      — 100 quando NFS-e gerada; código do primeiro erro em rejeição
+     *   - xMotivo              (string)   — descrição concatenada dos erros em rejeição
+     *   - dhProc               (string)
      *   - nfseXmlAssinado      (string)   — XML da NFS-e descompactado
-     *   - raw                  (stdClass) — JSON bruto decodificado
+     *   - erros                (array)    — lista de {codigo, descricao, complemento} em rejeição
+     *   - raw                  (stdClass)
      */
     public static function parseEmissao(string $json): stdClass
     {
@@ -50,7 +59,8 @@ class Response
         $result->numero = '';
         $result->cStat = isset($data->cStat) ? (int) $data->cStat : null;
         $result->xMotivo = (string) ($data->xMotivo ?? '');
-        $result->dhProc = (string) ($data->dhProc ?? '');
+        $result->dhProc = (string) ($data->dhProc ?? $data->dataHoraProcessamento ?? '');
+        $result->erros = [];
 
         if ($xml !== '') {
             self::enrichFromNfseXml($xml, $result);
@@ -58,6 +68,44 @@ class Response
 
         if ($result->chaveAcesso === '' && $result->idNFSe !== '') {
             $result->chaveAcesso = self::chaveFromIdNFSe($result->idNFSe);
+        }
+
+        // Sucesso: quando chegou NFS-e assinada, marca cStat=100 se ainda não definido.
+        if ($result->chaveAcesso !== '' && $xml !== '' && $result->cStat === null) {
+            $result->cStat = 100;
+        }
+
+        // Erro (NFSePostResponseErro): propaga lista de mensagens para cStat/xMotivo.
+        if (!empty($data->erros) && is_array($data->erros)) {
+            foreach ($data->erros as $err) {
+                if (!is_object($err)) {
+                    continue;
+                }
+                $result->erros[] = (object) [
+                    'codigo' => (string) ($err->codigo ?? ''),
+                    'descricao' => (string) ($err->descricao ?? ''),
+                    'complemento' => (string) ($err->complemento ?? ''),
+                ];
+            }
+
+            if ($result->cStat === null && isset($result->erros[0]->codigo) && $result->erros[0]->codigo !== '') {
+                $result->cStat = (int) $result->erros[0]->codigo;
+            }
+            if ($result->xMotivo === '') {
+                $result->xMotivo = implode(' | ', array_map(
+                    static function (stdClass $e): string {
+                        $msg = trim($e->descricao);
+                        if ($e->codigo !== '') {
+                            $msg = "[{$e->codigo}] {$msg}";
+                        }
+                        if ($e->complemento !== '') {
+                            $msg .= ' — ' . $e->complemento;
+                        }
+                        return $msg;
+                    },
+                    $result->erros
+                ));
+            }
         }
 
         return $result;
