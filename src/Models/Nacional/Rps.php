@@ -184,6 +184,18 @@ class Rps extends RpsBase
     public $infCServ = ['cTribNac' => '', 'cTribMun' => '', 'xDescServ' => '', 'cNBS' => ''];
 
     // -------------------------------------------------------------------------
+    // Informações complementares do serviço (serv/infoCompl)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Informações complementares do serviço (xInfComp, max 2000 chars).
+     * Bloco opcional infoCompl/xInfComp do XSD TCInfoCompl.
+     *
+     * @var array{idDocTec: string, docRef: string, xPed: string, xInfComp: string}
+     */
+    public $infInfoCompl = ['idDocTec' => '', 'docRef' => '', 'xPed' => '', 'xInfComp' => ''];
+
+    // -------------------------------------------------------------------------
     // Valores (valores) — estrutura v1.01: vServPrest + vDescCondIncond? + vDedRed? + trib{tribMun, tribFed?, totTrib}
     // -------------------------------------------------------------------------
 
@@ -617,6 +629,35 @@ class Rps extends RpsBase
             'cTribMun'  => $cTribMun,
             'xDescServ' => $xDescServ,
             'cNBS'      => $cNBS,
+        ];
+    }
+
+    /**
+     * Informações complementares do serviço prestado (serv/infoCompl).
+     *
+     * @param string $xInfComp Texto livre de informações complementares (max 2000 chars).
+     * @param string $docRef   Identificador de documento subsidiário (chave de NFe, contrato, etc.) — max 255.
+     * @param string $xPed     Número de pedido/ordem de compra/serviço (B2B).
+     * @param string $idDocTec Identificador de Documento de Responsabilidade Técnica (ART, RRT, DRT, Outros).
+     */
+    public function infoCompl(
+        string $xInfComp = '',
+        string $docRef = '',
+        string $xPed = '',
+        string $idDocTec = ''
+    ): void {
+        if ($xInfComp !== '' && !Validator::stringType()->length(1, 2000)->validate($xInfComp)) {
+            throw new InvalidArgumentException("xInfComp deve ter entre 1 e 2000 caracteres.");
+        }
+        if ($docRef !== '' && !Validator::stringType()->length(1, 255)->validate($docRef)) {
+            throw new InvalidArgumentException("docRef deve ter entre 1 e 255 caracteres.");
+        }
+
+        $this->infInfoCompl = [
+            'idDocTec' => $idDocTec,
+            'docRef'   => $docRef,
+            'xPed'     => $xPed,
+            'xInfComp' => $xInfComp,
         ];
     }
 

@@ -175,6 +175,33 @@ class RenderRps
             $dom->addChild($cServ, 'cNBS', $rps->infCServ['cNBS'], false, 'Código NBS', false);
         }
 
+        // ── infoCompl (informações complementares opcional) ─────────────────
+        // Sequência no XSD TCInfoCompl: idDocTec, docRef, xPed, gItemPed, xInfComp.
+        // Posição no serv: depois de cServ/comExt/obra/atvEvento (último filho).
+        $infoCompl = $rps->infInfoCompl ?? [];
+        $temInfoCompl = !empty($infoCompl['idDocTec'])
+            || !empty($infoCompl['docRef'])
+            || !empty($infoCompl['xPed'])
+            || !empty($infoCompl['xInfComp']);
+
+        if ($temInfoCompl) {
+            $infoComplEl = $dom->createElement('infoCompl');
+            $dom->appChild($serv, $infoComplEl, 'Adicionando infoCompl');
+
+            if (!empty($infoCompl['idDocTec'])) {
+                $dom->addChild($infoComplEl, 'idDocTec', $infoCompl['idDocTec'], false, 'Identificador de Documento Técnico', false);
+            }
+            if (!empty($infoCompl['docRef'])) {
+                $dom->addChild($infoComplEl, 'docRef', $infoCompl['docRef'], false, 'Documento de referência', false);
+            }
+            if (!empty($infoCompl['xPed'])) {
+                $dom->addChild($infoComplEl, 'xPed', $infoCompl['xPed'], false, 'Número do pedido/OS', false);
+            }
+            if (!empty($infoCompl['xInfComp'])) {
+                $dom->addChild($infoComplEl, 'xInfComp', $infoCompl['xInfComp'], false, 'Informações complementares', false);
+            }
+        }
+
         // ── Valores ──────────────────────────────────────────────────────────
         $valores = $dom->createElement('valores');
         $dom->appChild($infDPS, $valores, 'Adicionando valores');
