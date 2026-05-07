@@ -190,7 +190,9 @@ class Tools extends ToolsBase
 
     /**
      * Registra um evento já renderizado e assinado (XML assinado em string).
-     * O XML é compactado (GZip+Base64) e enviado em JSON no campo "eventoXmlGZipB64".
+     * O XML é compactado (GZip+Base64) e enviado em JSON no campo
+     * "pedidoRegistroEventoXmlGZipB64" (nome definido no swagger oficial; o
+     * nome "eventoXmlGZipB64" é apenas do response).
      *
      * A construção do XML de evento é feita pela classe Evento/RenderEvento
      * (ver Fase 2 do plano). Este método recebe o XML pronto para não acoplar
@@ -201,7 +203,7 @@ class Tools extends ToolsBase
         $this->guardChave($chaveAcesso);
 
         $payload = json_encode(
-            ['eventoXmlGZipB64' => base64_encode(gzencode($eventoXmlAssinado, 9))],
+            ['pedidoRegistroEventoXmlGZipB64' => base64_encode(gzencode($eventoXmlAssinado, 9))],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         );
 
