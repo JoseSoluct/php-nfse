@@ -124,9 +124,25 @@ class Response
                 $scalars = static::scalarChildren($rpsEl);
                 $response->rps = $scalars !== [] ? (object) $scalars : null;
             }
-
-            $response->nfe = static::readNfe($nfseEl);
         }
+
+        /*
+         * Os dados da nota vêm dentro de <nfse> no retorno COMPLETO, e soltos
+         * na raiz de <retorno> no REDUZIDO — que é o que a emissão devolve:
+         *
+         *   <retorno>
+         *     <mensagem><codigo>00001 - Sucesso</codigo></mensagem>
+         *     <numero_nfse>1402</numero_nfse>
+         *     <link_nfse>...</link_nfse>
+         *   </retorno>
+         *
+         * Ler só dentro de <nfse> deixava $nfe nulo num retorno de SUCESSO. O
+         * consumidor, sem o número, tratava a emissão como recusa — e a nota
+         * existia no município. É o pior desfecho possível, então a raiz entra
+         * como fallback: `readNfe()` já devolve null quando não acha nada, o
+         * que preserva o comportamento nos retornos de erro.
+         */
+        $response->nfe = static::readNfe($nfseEl ?? $root);
 
         return $response;
     }

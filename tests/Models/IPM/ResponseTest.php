@@ -347,4 +347,64 @@ final class ResponseTest extends TestCase
         $this->assertInstanceOf(ColomboResponse::class, $response);
         $this->assertTrue($response->isSuccess());
     }
+
+    /**
+     * O retorno REAL de uma emissao bem-sucedida em Lagoa Vermelha: formato
+     * reduzido, com os dados da nota soltos na raiz de <retorno> — e nao dentro
+     * de <nfse>, como no retorno completo.
+     *
+     * Ler so dentro de <nfse> deixava $nfe nulo num retorno de SUCESSO, e o
+     * consumidor, sem o numero, tratava a emissao como recusa. A nota 1402
+     * existia no municipio e o ERP dizia que a emissao havia falhado: o pior
+     * desfecho possivel, porque manda corrigir e reenviar o que ja foi emitido.
+     */
+    public function testEmissaoDeSucessoComDadosSoltosNaRaizDoRetorno(): void
+    {
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<retorno>'
+            . '  <mensagem><codigo>00001 - Sucesso</codigo></mensagem>'
+            . '  <numero_nfse>1402</numero_nfse>'
+            . '  <serie_nfse>1</serie_nfse>'
+            . '  <data_nfse>10/09/2026</data_nfse>'
+            . '  <hora_nfse>14:28:09</hora_nfse>'
+            . '  <situacao_codigo_nfse>1</situacao_codigo_nfse>'
+            . '  <situacao_descricao_nfse>Emitida</situacao_descricao_nfse>'
+            . '  <link_nfse>https://nfse-lagoavermelha.atende.net/detalhar/1/abc</link_nfse>'
+            . '</retorno>';
+
+        $response = Response::read($xml);
+
+        $this->assertTrue($response->isSuccess());
+        $this->assertTrue($response->hasCode(1));
+        $this->assertNotNull($response->nfe, 'os dados da nota tem de ser lidos da raiz de <retorno>');
+        $this->assertSame('1402', $response->nfe->numero_nfse);
+        $this->assertSame('1', $response->nfe->serie_nfse);
+        $this->assertSame('10/09/2026', $response->nfe->data_nfse);
+        $this->assertSame('14:28:09', $response->nfe->hora_nfse);
+        $this->assertSame(1, $response->nfe->situacao_codigo_nfse);
+        $this->assertSame('Emitida', $response->nfe->situacao_descricao_nfse);
+        $this->assertStringContainsString('nfse-lagoavermelha', $response->nfe->link_nfse);
+        $this->assertSame(1, $response->situacaoCodigo());
+        $this->assertTrue($response->isEmitida());
+    }
+
+    /**
+     * O retorno de erro segue sem dados de nota: `readNfe()` devolvendo null e
+     * nao um objeto vazio e o que permite ao consumidor distinguir "nao emitiu"
+     * de "emitiu e eu nao consegui ler".
+     */
+    public function testRetornoDeErroNaoInventaDadosDeNota(): void
+    {
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<retorno><mensagem><codigo>00383 - Lista de Servico informada nao possui '
+            . 'desdobramento nacional</codigo></mensagem></retorno>';
+
+        $response = Response::read($xml);
+
+        $this->assertFalse($response->isSuccess());
+        $this->assertTrue($response->hasCode(383));
+        $this->assertNull($response->nfe);
+        $this->assertNull($response->situacaoCodigo());
+        $this->assertFalse($response->isEmitida());
+    }
 }
