@@ -436,6 +436,21 @@ class Tools extends ToolsBase
 
         $this->captureSessionCookie($rawHeaders);
 
+        /*
+         * O 5xx com corpo que não é XML de retorno é a forma como o webservice
+         * reage a conteúdo que ele não trata: estoura do lado dele e devolve
+         * uma página de erro ("Server Error"), sem código nem motivo. Vale
+         * dizer isso na mensagem, porque a leitura natural de um 500 é "o
+         * servidor está fora" — e a investigação certa é o XML enviado.
+         */
+        if ($httpCode >= 500 && !$this->looksLikeRetornoXml($body)) {
+            throw new RuntimeException(
+                "Atende.Net retornou HTTP {$httpCode} (erro interno do webservice) em POST {$url}. "
+                . 'O servidor responde assim quando o XML tem conteúdo que ele não trata, sem informar '
+                . 'qual campo — confira o XML enviado. Resposta: ' . $this->excerpt($body)
+            );
+        }
+
         if ($httpCode >= 400 && !$this->looksLikeRetornoXml($body)) {
             throw new RuntimeException(
                 "Atende.Net retornou HTTP {$httpCode} em POST {$url}: " . $this->excerpt($body)

@@ -185,4 +185,51 @@ final class ToolsUrlTest extends TestCase
         $options = end($tools->captured);
         $this->assertSame(120, $options[CURLOPT_TIMEOUT]);
     }
+
+    /**
+     * O 500 com página de erro é a resposta do webservice a XML que ele não
+     * trata. Confundir isso com "servidor fora do ar" manda a investigação
+     * para o lado errado, então a mensagem tem de dizer o que significa e
+     * para onde olhar.
+     */
+    public function testHttp500ComPaginaDeErroApontaParaOXmlEnviado(): void
+    {
+        $tools = new FakeCurlTools($this->makeConfig());
+        $tools->queueResponse('<html><body><h1>Server Error</h1></body></html>', 500);
+
+        try {
+            $tools->sendXml('<nfse/>');
+            $this->fail('esperava RuntimeException para o HTTP 500');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('HTTP 500 (erro interno do webservice)', $e->getMessage());
+            $this->assertStringContainsString('confira o XML enviado', $e->getMessage());
+            $this->assertStringContainsString('Server Error', $e->getMessage());
+        }
+    }
+
+    public function testHttp4xxNaoCulpaOXmlEnviado(): void
+    {
+        $tools = new FakeCurlTools($this->makeConfig());
+        $tools->queueResponse('<html>Unauthorized</html>', 401);
+
+        try {
+            $tools->sendXml('<nfse/>');
+            $this->fail('esperava RuntimeException para o HTTP 401');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('HTTP 401', $e->getMessage());
+            $this->assertStringNotContainsString('confira o XML enviado', $e->getMessage());
+        }
+    }
+
+    /**
+     * XML de retorno legítimo com status 5xx segue sendo interpretado: quem
+     * decide se a nota foi aceita é o `<retorno>`, não o código HTTP.
+     */
+    public function testRetornoXmlCom5xxAindaEEntregueAoParser(): void
+    {
+        $tools = new FakeCurlTools($this->makeConfig());
+        $tools->queueResponse(self::RETORNO_OK, 500);
+
+        $this->assertSame(self::RETORNO_OK, $tools->sendXml('<nfse/>'));
+    }
 }
