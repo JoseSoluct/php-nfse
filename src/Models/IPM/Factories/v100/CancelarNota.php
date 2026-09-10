@@ -2,7 +2,6 @@
 
 namespace NFePHP\NFSe\Models\IPM\Factories\v100;
 
-use Exception;
 use InvalidArgumentException;
 use stdClass;
 use NFePHP\NFSe\Models\IPM\CancelarRps;
@@ -13,10 +12,15 @@ use NFePHP\NFSe\Models\IPM\Factories\Factory;
 class CancelarNota extends Factory
 {
     /**
-     * Método usado para gerar o XML do Soap Request
-     * @param $versao
-     * @param $rps
+     * Monta o XML de cancelamento de NFS-e conforme a NTE 35/2021 v2.9 (Tabela 5).
+     *
+     * Tags obrigatórias entram em $dom->errors quando vazias e o render() lança
+     * InvalidArgumentException antes de assinar.
+     *
+     * @param CancelarRps $rps
+     * @param stdClass $config - usa teste, cod_tom_municipio e encoding (UTF-8|ISO-8859-1)
      * @return string
+     * @throws InvalidArgumentException
      */
     public function render(
         CancelarRps $rps,
@@ -33,12 +37,12 @@ class CancelarNota extends Factory
         //Adiciona as tags ao DOM
         $dom->appendChild($root);
 
-        if($config->teste) {
+        if (!empty($config->teste)) {
             $dom->addChild(
                 $root,
                 'nfse_teste',
                 1,
-                true,
+                false,
                 "Definir como teste de integração",
                 true
             );
@@ -56,6 +60,16 @@ class CancelarNota extends Factory
             true
         );
 
+        //Tabela 5: <serie_nfse> entre <numero> e <situacao>
+        $dom->addChild(
+            $nf,
+            'serie_nfse',
+            $rps->infSerieNfse,
+            true,
+            "Série da nota fiscal",
+            true
+        );
+
         $dom->addChild(
             $nf,
             'situacao',
@@ -65,11 +79,14 @@ class CancelarNota extends Factory
             true
         );
 
+        // A CONFIRMAR: o catálogo de erros traz [119] "Não é necessário informar as observações
+        // sobre o cancelamento da NFS-e"; a doc não deixa claro se a tag vazia é aceita quando
+        // o município não usa observação. Mantido o formato atual (tag sempre presente).
         $dom->addChild(
             $nf,
             'observacao',
-            $rps->infObservacao,
-            true,
+            $rps->infObservacao ?? '',
+            false,
             "Motivo do cancelamento da NFS-e",
             true
         );
@@ -92,7 +109,7 @@ class CancelarNota extends Factory
         $dom->addChild(
             $prestador,
             'cidade',
-            $config->cod_tom_municipio,
+            $config->cod_tom_municipio ?? '',
             true,
             "Código tom do municipio do emissor da nota",
             true
@@ -101,11 +118,13 @@ class CancelarNota extends Factory
         //Adiciona as tags ao DOM
         $root->appendChild($prestador);
 
-        $body = str_replace('<?xml version="1.0" encoding="utf-8"?>', '', $dom->saveXML());
+        //Nada de XML incompleto segue para assinatura ou transmissão
+        $this->lancarErrosDoDom($dom);
 
-        #Se prefeitura trabalhar com assinatutura deve ser passado o certificado
+        $body = $this->clear($dom->saveXML());
+
+        #Se prefeitura trabalhar com assinatura deve ser passado o certificado
         if ($this->certificate) {
-
             $body = Signer::sign(
                 $this->certificate,
                 $body,
@@ -113,12 +132,11 @@ class CancelarNota extends Factory
                 'id',
                 $this->algorithm,
                 [false, false, null, null],
-                '',
-                true
+                ''
             );
         }
 
-        $body = $this->clear($body);        
-        return '<?xml version="1.0" encoding="ISO-8859-1"?>' . $body;
+        $body = $this->clear($body);
+        return $this->declararEncoding($body, $config);
     }
 }

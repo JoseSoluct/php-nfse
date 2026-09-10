@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace NFePHP\NFSe\Models\IPM;
 
@@ -11,14 +11,15 @@ use Respect\Validation\Validator;
  */
 class ItensRps
 {
- 
+
     /**
      * @var int
      */
     public $infCodigoLocalPrestacaoServico;
 
     /**
-     * @var int
+     * "0"/"N" tributa no local da prestação; "1"/"S" tributa no município do prestador
+     * @var string
      */
     public $infTributaMunicipioPrestador;
 
@@ -41,6 +42,11 @@ class ItensRps
      * @var int
      */
     public $infCodigoItemListaServico;
+    /**
+     * Código de atividade conforme definido no município (opcional)
+     * @var int|null
+     */
+    public $infCodigoAtividade;
     /**
      * @var string
      */
@@ -79,27 +85,30 @@ class ItensRps
             $msg = "O item '$campo' deve ser inteiro, referente ao código TOM junto a receita federal. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->validate($value)) {
+        if (!Validator::numericVal()->intVal()->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infCodigoLocalPrestacaoServico = $value;
     }
 
     /**
-     * Set opting for Simple National tax regime
-     * @param int $value
+     * Informa onde será recolhido o imposto (tag <tributa_municipio_prestador>).
+     * A NTE 35/2021 só aceita "0"/"N" (local da prestação) ou "1"/"S" (município
+     * do prestador); os inteiros 0 e 1 também são aceitos. "2" é inválido.
+     * @param string|int $value
      * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
      * @throws InvalidArgumentException
      */
-    public function tributaMunicipioPrestador($value = Rps::SIM, $campo = null)
+    public function tributaMunicipioPrestador($value = Rps::TRIBUTA_MUNICIPIO_PRESTADOR, $campo = null)
     {
         if (!$campo) {
-            $msg = "Tributa municipio prestador deve ser 1 ou 2.";
+            $msg = "Tributa municipio prestador deve ser 0/N (local da prestação) ou 1/S (município do prestador).";
         } else {
-            $msg = "O item '$campo' deve ser 1 ou 2. Informado: '$value'";
+            $msg = "O item '$campo' deve ser 0/N ou 1/S. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->between(1, 2)->validate($value)) {
+        $value = strtoupper(trim((string) $value));
+        if (!in_array($value, ['0', '1', 'N', 'S'], true)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infTributaMunicipioPrestador = $value;
@@ -119,7 +128,7 @@ class ItensRps
             $msg = "O item '$campo' deve ser númerico e possuir até 9 dígitos. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->length(1, 9)->validate($value)) {
+        if (!Validator::numericVal()->intVal()->length(1, 9)->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infUnidadeCodigo = $value;
@@ -139,7 +148,7 @@ class ItensRps
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infUnidadeQuantidade = $this->getValorFormatado($value);
@@ -159,7 +168,7 @@ class ItensRps
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infUnidadeValorUnitario = $this->getValorFormatado($value);
@@ -179,15 +188,42 @@ class ItensRps
             $msg = "O item '$campo' deve ser inteiro, referente a subitem da lista de serviços. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->validate($value)) {
+        if (!Validator::numericVal()->intVal()->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infCodigoItemListaServico = $value;
     }
 
     /**
-     * Set opting for Code Unidad
+     * Código de atividade conforme definido no município (tag <codigo_atividade>).
+     * Opcional: só sai no XML quando informado.
      * @param int $value
+     * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
+     * @throws InvalidArgumentException
+     */
+    public function codigoAtividade($value, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "O código de atividade deve ser númerico e possuir até 9 dígitos.";
+        } else {
+            $msg = "O item '$campo' deve ser númerico e possuir até 9 dígitos. Informado: '$value'";
+        }
+
+        if (!Validator::numericVal()->intVal()->length(1, 9)->validate($value)) {
+            throw new \InvalidArgumentException($msg);
+        }
+        $this->infCodigoAtividade = $value;
+    }
+
+    /**
+     * Descritivo coloquial do serviço prestado (texto livre, até 1000 caracteres).
+     *
+     * A barra ("/") é trocada por hífen: a Tabela 3 da NTE 35/2021 v2.9 lista
+     * os caracteres especiais que o webservice escapa e marca a barra como
+     * "Não é permitido" — ela não tem entidade de escape e derruba o
+     * processamento do arquivo. {@see sanitizeTextoLivre()}
+     *
+     * @param string $value
      * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
      * @throws InvalidArgumentException
      */
@@ -196,9 +232,10 @@ class ItensRps
         if (!$campo) {
             $msg = "Descritivo coloquial do serviço prestado nao pode ser vazio e deve ter até 1000 caracteres";
         } else {
-            $msg = "O item '$campo' deve ser númerico e possuir até 9 dígitos. Informado: '$value'";
+            $msg = "O item '$campo' não pode ser vazio e deve ter até 1000 caracteres. Informado: '$value'";
         }
 
+        $value = $this->sanitizeTextoLivre($value);
         if (!Validator::length(1, 1000)->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
@@ -219,7 +256,7 @@ class ItensRps
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infAliquotaItemListaServico = $this->getValorFormatado($value);
@@ -239,7 +276,7 @@ class ItensRps
             $msg = "O item '$campo' deve ser númerico e possuir até 4 dígitos. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->length(1, 4)->validate($value)) {
+        if (!Validator::numericVal()->length(1, 4)->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infSituacaoTributaria = $value;
@@ -259,7 +296,7 @@ class ItensRps
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infValorTributavel = $this->getValorFormatado($value);
@@ -279,7 +316,7 @@ class ItensRps
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infValorDeducao = $this->getValorFormatado($value);
@@ -299,7 +336,7 @@ class ItensRps
             $msg = "O item '$campo' deve ser numérico tipo float. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->floatVal()->min(0)->validate($value)) {
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infValorIssrf = $this->getValorFormatado($value);
@@ -308,5 +345,25 @@ class ItensRps
     private function getValorFormatado($value)
     {
         return \number_format(round($value, 2), 2, ',', '');
+    }
+
+    /**
+     * Troca a barra ("/") por hífen nos campos de texto livre.
+     *
+     * A Tabela 3 da NTE 35/2021 v2.9 relaciona os caracteres especiais que o
+     * Atende.Net escapa no XML (&, <, >, ", ') e registra a barra como "Não é
+     * permitido": ela não possui entidade de escape e faz o webservice recusar
+     * o arquivo. Como o saneamento é exigência do provedor — e não do
+     * consumidor —, ele mora aqui, para que toda aplicação que use a
+     * biblioteca herde o mesmo comportamento.
+     *
+     * A troca é 1:1, então não altera o tamanho validado do campo.
+     *
+     * @param string|null $value
+     * @return string
+     */
+    private function sanitizeTextoLivre($value)
+    {
+        return \str_replace('/', '-', (string) $value);
     }
 }

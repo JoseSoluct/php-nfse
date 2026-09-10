@@ -7,12 +7,18 @@ use NFePHP\Common\Soap\SoapBase;
 use NFePHP\Common\Exception\SoapException;
 
 /**
- * Description of SoapCurl SIGISS
+ * Transporte REST do webservice ANTIGO da IPM (nfs-e.net), que recebia
+ * login/senha/cidade como campos do form-data.
+ *
+ * @deprecated O protocolo mudou (Atende.Net, NTE 35/2021 v2.9): a autenticação
+ *             é HTTP Basic e a URL é por município. {@see \NFePHP\NFSe\Models\IPM\Tools}
+ *             faz o transporte com cURL próprio e não usa esta classe. Mantida
+ *             apenas para consumidores externos que ainda a instanciem.
  *
  * @author Tiago Franco
  */
-class SoapCurl extends SoapBase 
-{   
+class SoapCurl extends SoapBase
+{
     /**
      * Comunica com os servidores IPM via REST
      * @param string $url
@@ -39,7 +45,8 @@ class SoapCurl extends SoapBase
         //check or create key files
         //before send request
         $response = '';
-        
+        $httpcode = 0;
+
         try {
             $oCurl = curl_init();
             curl_setopt($oCurl, CURLOPT_URL, $url);
@@ -54,11 +61,12 @@ class SoapCurl extends SoapBase
             }
             $httpcode = curl_getinfo($oCurl, CURLINFO_HTTP_CODE);
             curl_close($oCurl);
-            
+
+            // Nunca gravar a senha em disco: os campos de credencial saem redigidos.
             $this->saveDebugFiles(
                 $operation,
-                json_encode($parameters),
-                $response
+                json_encode(self::redactParameters($parameters)),
+                (string) $response
             );
         } catch (\Exception $e) {
             throw $e;
@@ -67,9 +75,55 @@ class SoapCurl extends SoapBase
             throw new \Exception($this->soaperror . " [$url]", 500);
         }
         if ($httpcode != 200) {
-            throw new \Exception(" [$url]" . json_encode($parameters), 500);
+            // O corpo é onde vem a mensagem de erro do município; as credenciais
+            // (login/senha do form-data) nunca entram na exceção.
+            throw new \Exception(
+                "POST [$url] retornou HTTP $httpcode: " . substr(trim((string) $response), 0, 500),
+                500
+            );
         }
 
         return $response;
+    }
+
+    /**
+     * Sem certificado (o IPM não exige) o SoapBase::saveDebugFiles() do
+     * sped-common chama $this->certificate->getCnpj() em null e derruba o
+     * processo; aqui o debug simplesmente não grava nada nesse caso.
+     *
+     * @param string $operation
+     * @param string $request
+     * @param string $response
+     * @return void
+     */
+    public function saveDebugFiles($operation, $request, $response)
+    {
+        if (!$this->debugmode || $this->certificate === null) {
+            return;
+        }
+
+        parent::saveDebugFiles($operation, $request, $response);
+    }
+
+    /**
+     * Substitui valores de credencial por "***" antes de qualquer registro.
+     *
+     * @param array<string, mixed> $parameters
+     * @return array<string, mixed>
+     */
+    private static function redactParameters($parameters)
+    {
+        if (!is_array($parameters)) {
+            return [];
+        }
+        foreach ($parameters as $key => $value) {
+            if (preg_match('/senha|password|passwd|pass|secret|token/i', (string) $key)) {
+                $parameters[$key] = '***';
+            } elseif ($value instanceof \CURLFile || $value instanceof \CURLStringFile) {
+                $parameters[$key] = '[arquivo]';
+            }
+        }
+
+        return $parameters;
     }
 }

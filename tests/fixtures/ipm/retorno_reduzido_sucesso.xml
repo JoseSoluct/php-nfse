@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<retorno>
+  <mensagem>
+    <codigo>[00001] - Sucesso</codigo>
+  </mensagem>
+  <nfse>
+    <identificador>PED-2026-000123</identificador>
+    <rps>
+      <nro_recibo_provisorio>123</nro_recibo_provisorio>
+      <serie_recibo_provisorio>1</serie_recibo_provisorio>
+      <data_emissao_recibo_provisorio>09/09/2026</data_emissao_recibo_provisorio>
+      <hora_emissao_recibo_provisorio>10:15:02</hora_emissao_recibo_provisorio>
+    </rps>
+    <nfe>
+      <numero_nfse>4521</numero_nfse>
+      <serie_nfse>1</serie_nfse>
+      <data_nfse>09/09/2026</data_nfse>
+      <hora_nfse>10:15:32</hora_nfse>
+      <situacao_codigo_nfse>1</situacao_codigo_nfse>
+      <situacao_descricao_nfse>Emitida</situacao_descricao_nfse>
+      <link_nfse>https://cidade.atende.net/?pg=servicos&amp;service=nfse&amp;cod=ABCD1234EFGH5678</link_nfse>
+      <cod_verificador_autenticidade>ABCD-1234-EFGH-5678</cod_verificador_autenticidade>
+    </nfe>
+  </nfse>
+</retorno>

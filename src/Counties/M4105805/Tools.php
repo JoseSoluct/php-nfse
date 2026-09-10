@@ -5,7 +5,7 @@ namespace NFePHP\NFSe\Counties\M4105805;
 /**
  * Classe para a comunicação com os webservices da
  * Cidade de Colombo PR
- * conforme o modelo IPM
+ * conforme o modelo IPM (Atende.Net)
  *
  * @category  NFePHP
  * @package   NFePHP\NFSe\Counties\M4105805\Tools
@@ -22,11 +22,6 @@ use NFePHP\NFSe\Models\IPM\Tools as ToolsIPM;
 class Tools extends ToolsIPM
 {
     /**
-     * Webservices URL
-     * @var array
-     */
-    protected $url = [];
-    /**
      * County Namespace
      * @var string
      */
@@ -37,10 +32,19 @@ class Tools extends ToolsIPM
      */
     protected $soapversion = SOAP_1_1;
     /**
-     * SIAFI County Cod
+     * SIAFI/TOM County Cod — usado como padrão de $config->cod_tom_municipio
+     * quando a configuração não o informa.
      * @var int
      */
     protected $codcidade = 7513;
+    /**
+     * Slug do município na URL do Atende.Net
+     * (https://colombo.atende.net/?pg=rest&service=WNERestServiceNFSe).
+     * $config->city_slug, quando informado, tem precedência.
+     * // A CONFIRMAR: subdomínio exato de Colombo/PR no Atende.Net.
+     * @var string
+     */
+    protected $citySlug = 'colombo';
     /**
      * Indicates when use CDATA string on message
      * @var boolean

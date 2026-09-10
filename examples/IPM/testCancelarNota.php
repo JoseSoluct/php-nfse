@@ -22,9 +22,10 @@ $arr = [
     "cmun" => "4105805", //COLOMBO
     "siglaUF" => "PR",
     "cod_tom_municipio" => "7513", //importante para uso das operacoes IPM
-    "teste" => 1, #defini a operacao como teste
+    "teste" => 1, #define a operacao como teste (tag <nfse_teste>)
     "trabalha_com_rps" => 1, //define se a prefeitura trabalha com rps
-    "login" => 'usuario@user.com.br', //usuario e senha para autenticacao 
+    "encoding" => "UTF-8", //UTF-8 (default) ou ISO-8859-1; a declaracao XML sempre reflete o encoding real do conteudo
+    "login" => 'usuario@user.com.br', //usuario e senha para autenticacao
     "senha" => 'senha',
     "pathNFSeFiles" => "/dados/nfse",
     "proxyConf" => [
@@ -32,39 +33,40 @@ $arr = [
         "proxyPort" => "",
         "proxyUser" => "",
         "proxyPass" => ""
-    ]    
+    ]
 ];
 $configJson = json_encode($arr);
 $contentpfx = file_get_contents(__DIR__ . '/../../tests/fixtures/certs/certificado_teste.pfx');
 
 try {
-    
+
     $nfse = new NFSe($configJson, Certificate::readPfx($contentpfx, 'senha'));
-    //Por ora apenas o SoapCurl funciona com IssNet
+    //Por ora apenas o SoapCurl funciona com IPM
     $nfse->tools->loadSoapClass(new SoapCurl());
-    //caso o mode debug seja ativado serão salvos em arquivos 
-    //a requisicção SOAP e a resposta do webservice na pasta de 
+    //caso o mode debug seja ativado serão salvos em arquivos
+    //a requisicção SOAP e a resposta do webservice na pasta de
     //arquivos temporarios do SO em sub pasta denominada "soap"
     $nfse->tools->setDebugSoapMode(false);
-    
-    //definir as informacoes para cancelamento da nota
+
+    //definir as informacoes para cancelamento da nota (Tabela 5 da NTE 35/2021)
     $rps = new CancelarRps();
     $rps->cpfCnpjPrestador('99999999999999');
     $rps->numeroNfse(2);
-    $rps->observacao('TESTE DE CANCELAMEMTO');
+    $rps->serieNfse(1); //<serie_nfse> e obrigatoria no cancelamento
     $rps->situacao(CancelarRps::CANCELAR);
-    
+    $rps->observacao('TESTE DE CANCELAMENTO');
+
     //envio do RPS
     $response = $nfse->tools->cancelarNota($rps);
-    
+
     //apresentação do retorno
     header("Content-type: text/xml");
     echo $response;
-    
+
 } catch (\NFePHP\Common\Exception\SoapException $e) {
     echo $e->getMessage();
 } catch (NFePHP\Common\Exception\CertificateException $e) {
     echo $e->getMessage();
 } catch (Exception $e) {
     echo $e->getMessage();
-}    
+}

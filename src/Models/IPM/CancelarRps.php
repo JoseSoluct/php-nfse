@@ -5,7 +5,7 @@ namespace NFePHP\NFSe\Models\IPM;
 /**
  * Classe para definicao de informacoes
  * para operacoes de cancelamentos de notas
- * 
+ *
  *
  * @category  NFePHP
  * @package   NFePHP\NFSe\Models\IPM\Rps
@@ -17,7 +17,7 @@ namespace NFePHP\NFSe\Models\IPM;
  * @link      http://github.com/nfephp-org/sped-nfse for the canonical source repository
  */
 
- use \DateTime;
+use \DateTime;
 use Respect\Validation\Validator;
 use NFePHP\NFSe\Common\Rps as RpsBase;
 
@@ -25,14 +25,17 @@ class CancelarRps extends RpsBase
 {
     const CANCELAR = 'C';
 
+    /**
+     * Campos 0/1 do leiaute AtendeNet: "1"/"S" é sim, "0"/"N" é não. "2" é inválido.
+     */
     const SIM = 1;
-    const NAO = 2;
+    const NAO = 0;
 
     /**
      * @var string
      */
     public $infCpfCnpjPrestador;
-    
+
     /**
      * @var int
      */
@@ -49,10 +52,10 @@ class CancelarRps extends RpsBase
     public $infSituacao;
 
     /**
-     * @var float
+     * @var string
      */
     public $infObservacao;
-    
+
     /**
      * @var int
      */
@@ -64,12 +67,13 @@ class CancelarRps extends RpsBase
     public $infSerieNfseSubstituta;
 
     /**
-     * @var CancelarRps[] 
+     * @var CancelarRps[]
      */
     public $infDocumentos = [];
 
     /**
-     * Set servico conforme Lista (código DMS). 
+     * CPF/CNPJ do prestador. A pontuação é removida e o leiaute exige apenas
+     * números, com 11 (CPF) ou 14 (CNPJ) dígitos.
      * @param string $value
      * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
      * @throws InvalidArgumentException
@@ -77,15 +81,15 @@ class CancelarRps extends RpsBase
     public function cpfCnpjPrestador($value, $campo = null)
     {
         if (!$campo) {
-            $msg = "O cpf cnpj não pode ser vazia e deve ter entre 11 ou 14 números.";
+            $msg = "O cpf cnpj não pode ser vazio e deve ter 11 ou 14 números.";
         } else {
-            $msg = "O item '$campo' não pode ser vazio e deve ter entre 11 ou 14 números. Informado: '$value'";
+            $msg = "O item '$campo' não pode ser vazio e deve ter 11 ou 14 números. Informado: '$value'";
         }
 
-        $value = trim($value);
-        if (!Validator::length(1, 14)->validate($value)) {
+        $value = preg_replace('/\D/', '', (string) $value);
+        if (!Validator::regex('/^(\d{11}|\d{14})$/')->validate($value)) {
             throw new \InvalidArgumentException($msg);
-        }        
+        }
 
         $this->infCpfCnpjPrestador = $value;
     }
@@ -99,12 +103,12 @@ class CancelarRps extends RpsBase
     public function numeroNfse($value, $campo = null)
     {
         if (!$campo) {
-            $msg = "O numero do RPS deve ser um inteiro positivo apenas.";
+            $msg = "O numero da NFS-e deve ser um inteiro positivo apenas.";
         } else {
             $msg = "O item '$campo' deve ser um inteiro positivo apenas. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->positive()->validate($value)) {
+        if (!Validator::numericVal()->intVal()->positive()->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infNumeroNfse = $value;
@@ -147,7 +151,7 @@ class CancelarRps extends RpsBase
     }
 
     /**
-     * Set serie of RPS
+     * Série da NFS-e a ser cancelada (tag <serie_nfse>)
      * @param int $value
      * @param string $campo - String com o nome do campo caso queira mostrar na mensagem de validação
      * @throws InvalidArgumentException
@@ -155,12 +159,12 @@ class CancelarRps extends RpsBase
     public function serieNfse($value, $campo = null)
     {
         if (!$campo) {
-            $msg = "O numero do RPS deve ser um inteiro positivo apenas.";
+            $msg = "A série da NFS-e deve ser um inteiro positivo apenas.";
         } else {
             $msg = "O item '$campo' deve ser um inteiro positivo apenas. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->positive()->validate($value)) {
+        if (!Validator::numericVal()->intVal()->positive()->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infSerieNfse = $value;
@@ -175,12 +179,12 @@ class CancelarRps extends RpsBase
     public function infNumeroNfseSubstituta($value, $campo = null)
     {
         if (!$campo) {
-            $msg = "O numero do RPS deve ser um inteiro positivo apenas.";
+            $msg = "O numero da NFS-e substituta deve ser um inteiro positivo apenas.";
         } else {
             $msg = "O item '$campo' deve ser um inteiro positivo apenas. Informado: '$value'";
         }
 
-        if (!Validator::numeric()->intVal()->positive()->validate($value)) {
+        if (!Validator::numericVal()->intVal()->positive()->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infNumeroNfseSubstituta = $value;
@@ -195,13 +199,13 @@ class CancelarRps extends RpsBase
     public function serieNfseSubstituta($value, $campo = null)
     {
         if (!$campo) {
-            $msg = "A série do RPS deve ser um inteiro positivo apenas.";
+            $msg = "A série da NFS-e substituta deve ser um inteiro positivo apenas.";
         } else {
             $msg = "O item '$campo' deve ser um inteiro positivo apenas. Informado: '$value'";
         }
 
         $value = trim($value);
-        if (!Validator::numeric()->intVal()->positive()->validate($value)) {
+        if (!Validator::numericVal()->intVal()->positive()->validate($value)) {
             throw new \InvalidArgumentException($msg);
         }
         $this->infSerieNfseSubstituta = $value;

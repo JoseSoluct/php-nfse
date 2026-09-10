@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<retorno>
+  <documentos>
+    <nfse>
+      <dados>
+        <numero>4521</numero>
+        <serie>1</serie>
+      </dados>
+      <mensagem>
+        <codigo>[00001] - Sucesso</codigo>
+      </mensagem>
+    </nfse>
+    <nfse>
+      <dados>
+        <numero>4522</numero>
+        <serie>1</serie>
+      </dados>
+      <mensagem>
+        <codigo>[00117] - A NFS-e já se encontra cancelada.</codigo>
+      </mensagem>
+      <mensagem>
+        <codigo>[00162] - A data limite para o cancelamento da NFS-e foi ultrapassada pela data atual.</codigo>
+      </mensagem>
+    </nfse>
+  </documentos>
+</retorno>

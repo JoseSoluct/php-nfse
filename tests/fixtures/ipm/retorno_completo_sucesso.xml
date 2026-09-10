@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<retorno>
+  <mensagem>
+    <codigo>[00001] - Sucesso</codigo>
+  </mensagem>
+  <nfse>
+    <identificador>PED-2026-000124</identificador>
+    <nf>
+      <numero_nfse>4522</numero_nfse>
+      <serie_nfse>1</serie_nfse>
+      <data_nfse>09/09/2026</data_nfse>
+      <hora_nfse>11:02:45</hora_nfse>
+      <situacao_codigo_nfse>1</situacao_codigo_nfse>
+      <situacao_descricao_nfse>Emitida</situacao_descricao_nfse>
+      <link_nfse>https://cidade.atende.net/?pg=servicos&amp;service=nfse&amp;cod=ZZZZ9999YYYY8888</link_nfse>
+      <cod_verificador_autenticidade>ZZZZ-9999-YYYY-8888</cod_verificador_autenticidade>
+      <valor_total>1500.00</valor_total>
+      <valor_desconto>0.00</valor_desconto>
+      <valor_ir>0.00</valor_ir>
+      <valor_inss>0.00</valor_inss>
+      <valor_contribuicao_social>0.00</valor_contribuicao_social>
+      <valor_rps>0.00</valor_rps>
+      <valor_pis>0.00</valor_pis>
+      <valor_cofins>0.00</valor_cofins>
+      <observacao>Serviço de manutenção predial</observacao>
+    </nf>
+    <prestador>
+      <cpfcnpj>99999999000191</cpfcnpj>
+      <cidade>7513</cidade>
+    </prestador>
+    <tomador>
+      <tipo>E</tipo>
+      <identificador>PASSAPORTE-XX-778899</identificador>
+      <estado>California</estado>
+      <pais>Estados Unidos</pais>
+      <cpfcnpj></cpfcnpj>
+      <nome_razao_social>TOMADOR ESTRANGEIRO</nome_razao_social>
+      <logradouro>Rua Exemplo</logradouro>
+      <email>tomador@example.test</email>
+      <numero_residencia>100</numero_residencia>
+      <bairro>Centro</bairro>
+      <cidade>Los Angeles</cidade>
+      <cep>00000000</cep>
+    </tomador>
+    <itens>
+      <Item>
+        <tributa_municipio_prestador>S</tributa_municipio_prestador>
+        <codigo_local_prestacao_servico>7513</codigo_local_prestacao_servico>
+        <unidade_codigo>1</unidade_codigo>
+        <unidade_quantidade>1.00</unidade_quantidade>
+        <unidade_valor_unitario>1500.00</unidade_valor_unitario>
+        <codigo_item_lista_servico>1401</codigo_item_lista_servico>
+        <descritivo>Manutenção predial</descritivo>
+        <aliquota_item_lista_servico>3.00</aliquota_item_lista_servico>
+        <situacao_tributaria>0</situacao_tributaria>
+        <valor_tributavel>1500.00</valor_tributavel>
+        <valor_deducao>0.00</valor_deducao>
+        <valor_issrf>0.00</valor_issrf>
+      </Item>
+      <Item>
+        <tributa_municipio_prestador>S</tributa_municipio_prestador>
+        <codigo_local_prestacao_servico>7513</codigo_local_prestacao_servico>
+        <unidade_codigo>1</unidade_codigo>
+        <unidade_quantidade>2.00</unidade_quantidade>
+        <unidade_valor_unitario>10.00</unidade_valor_unitario>
+        <codigo_item_lista_servico>1401</codigo_item_lista_servico>
+        <descritivo>Deslocamento</descritivo>
+        <aliquota_item_lista_servico>3.00</aliquota_item_lista_servico>
+        <situacao_tributaria>0</situacao_tributaria>
+        <valor_tributavel>20.00</valor_tributavel>
+        <valor_deducao>0.00</valor_deducao>
+        <valor_issrf>0.00</valor_issrf>
+      </Item>
+    </itens>
+  </nfse>
+</retorno>

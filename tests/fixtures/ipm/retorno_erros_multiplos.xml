@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<retorno>
+  <mensagem>
+    <codigo>[00011] - Tipo do tomador ("F" - Física ou "J" - Jurídica ou "E" - Estrangeiro) está ausente no arquivo XML.</codigo>
+  </mensagem>
+  <mensagem>
+    <codigo>[00020] - Nome/razão social do tomador não definido no arquivo XML.</codigo>
+  </mensagem>
+</retorno>

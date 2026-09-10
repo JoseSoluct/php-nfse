@@ -2,21 +2,30 @@
 
 namespace NFePHP\NFSe\Models\IPM\Factories\v100;
 
-use Exception;
 use InvalidArgumentException;
 use stdClass;
 use NFePHP\NFSe\Models\IPM\CancelarRps;
 use NFePHP\NFSe\Common\DOMImproved as Dom;
-use NFePHP\NFSe\Models\IPM\Factories\Signer;
 use NFePHP\NFSe\Models\IPM\Factories\Factory;
 
 class SolicitarCancelamentoNota extends Factory
 {
     /**
-     * Método usado para gerar o XML do Soap Request
-     * @param $versao
-     * @param $rps
+     * Monta o XML de solicitação de cancelamento de NFS-e conforme a NTE 35/2021 v2.9
+     * (Tabela 6). Usado quando o prazo de cancelamento autônomo já expirou; a solicitação
+     * passa por análise do município.
+     *
+     * A Tabela 6 não prevê <nfse_teste> para este serviço, por isso a tag não é emitida.
+     *
+     * A CONFIRMAR: esta factory não assina o XML mesmo com certificado presente. O §4.10
+     * define a referência de assinatura apenas para a tag <nfse id="nota"> (emissão e
+     * cancelamento); a raiz aqui é <solicitacao_cancelamento> e a doc não diz onde a
+     * assinatura entraria nem se o serviço a exige.
+     *
+     * @param CancelarRps $rps
+     * @param stdClass $config - usa cod_tom_municipio e encoding (UTF-8|ISO-8859-1)
      * @return string
+     * @throws InvalidArgumentException
      */
     public function render(
         CancelarRps $rps,
@@ -29,17 +38,6 @@ class SolicitarCancelamentoNota extends Factory
 
         //Adiciona as tags ao DOM
         $dom->appendChild($root);
-
-        if ($config->teste) {
-            $dom->addChild(
-                $root,
-                'nfse_teste',
-                1,
-                true,
-                "Definir como teste de integração",
-                true
-            );
-        }
 
         //Cria o elemento prestador
         $prestador = $dom->createElement('prestador');
@@ -56,7 +54,7 @@ class SolicitarCancelamentoNota extends Factory
         $dom->addChild(
             $prestador,
             'cidade',
-            $config->cod_tom_municipio,
+            $config->cod_tom_municipio ?? '',
             true,
             "Código tom do municipio do emissor da nota",
             true
@@ -76,7 +74,7 @@ class SolicitarCancelamentoNota extends Factory
         //Cria o elemento documentos
         $documentos = $dom->createElement('documentos');
 
-        /** @var $item CancelarRps[] */
+        /** @var CancelarRps $documento */
         foreach ($rps->infDocumentos as $documento) {
             //Cria o elemento nfse
             $nfse = $dom->createElement('nfse');
@@ -86,7 +84,7 @@ class SolicitarCancelamentoNota extends Factory
                 'numero',
                 $documento->infNumeroNfse,
                 true,
-                "Número da nota a ser substituida",
+                "Número da nota a ser cancelada",
                 true
             );
 
@@ -95,7 +93,7 @@ class SolicitarCancelamentoNota extends Factory
                 'serie',
                 $documento->infSerieNfse,
                 true,
-                "Séria da nota a ser substituida",
+                "Série da nota a ser cancelada",
                 true
             );
 
@@ -108,6 +106,7 @@ class SolicitarCancelamentoNota extends Factory
                 true
             );
 
+            //Grupo <substituta> é opcional: só sai quando informado
             if ($documento->infNumeroNfseSubstituta || $documento->infSerieNfseSubstituta) {
                 //Cria o elemento substituta
                 $substituta = $dom->createElement('substituta');
@@ -126,13 +125,12 @@ class SolicitarCancelamentoNota extends Factory
                     'serie',
                     $documento->infSerieNfseSubstituta,
                     true,
-                    "Séria da nota substituta",
+                    "Série da nota substituta",
                     true
                 );
                 //Adiciona as tags ao DOM
                 $nfse->appendChild($substituta);
             }
-
 
             //Adiciona as tags ao DOM
             $documentos->appendChild($nfse);
@@ -140,10 +138,13 @@ class SolicitarCancelamentoNota extends Factory
         //Adiciona as tags ao DOM
         $root->appendChild($documentos);
 
+        //Nada de XML incompleto segue para transmissão
+        $this->lancarErrosDoDom($dom);
 
-        $body = $dom->saveXML();
-        $body = $this->clear($body);
-        #echo '<pre>'.print_r($body).'</pre>';die;
-        return '<?xml version="1.0" encoding="ISO-8859-1"?>' . $body;
+        $body = $this->clear($dom->saveXML());
+
+        // A CONFIRMAR: nao assina mesmo com certificado; o §4.10 so define a referencia
+        // id="nota" para a raiz <nfse>, e a doc nao diz como assinar <solicitacao_cancelamento>.
+        return $this->declararEncoding($body, $config);
     }
 }

@@ -2,229 +2,631 @@
 
 namespace NFePHP\NFSe\Models\IPM;
 
-use stdClass;
+use CURLStringFile;
 use NFePHP\Common\Certificate;
 use NFePHP\NFSe\Common\DateTime;
 use NFePHP\NFSe\Common\Tools as ToolsBase;
+use RuntimeException;
+use stdClass;
 
 /**
- * Classe para a comunicação com os webservices
- * conforme o modelo IPM
- * 
+ * Cliente REST do webservice Atende.Net (IPM Sistemas) para emissão de NFS-e,
+ * conforme a Nota Técnica NTE 35/2021 versão 2.9.
+ *
+ * Protocolo oficial:
+ *   - URL por município do PRESTADOR:
+ *       https://{cidade}.atende.net/?pg=rest&service=WNERestServiceNFSe
+ *     onde {cidade} é o nome do município sem pontuação e sem espaços.
+ *   - Autenticação HTTP Basic: username = CPF/CNPJ do emissor (só dígitos,
+ *     erro [144] caso contrário) e password = senha de acesso ao sistema.
+ *   - POST multipart/form-data com UMA parte de arquivo contendo o XML.
+ *     Uma nota por XML; as requisições são síncronas (só iniciar a próxima
+ *     depois de concluir a anterior).
+ *   - A primeira resposta devolve o cookie PHPSESSID; reenviá-lo nas próximas
+ *     requisições reduz consideravelmente o tempo de emissão.
+ *   - Resposta sempre em XML (<retorno>), interpretada por {@see Response}.
+ *
+ * Configuração ($config) esperada:
+ *   - city_slug        (string, obrigatório salvo url_template sem {cidade})
+ *                      nome do município do prestador; é normalizado
+ *                      (minúsculas, sem acento, sem pontuação/espaço).
+ *   - url_template     (string, opcional) sobrescreve o template inteiro;
+ *                      pode conter o marcador {cidade}.
+ *   - multipart_field  (string, opcional, padrão 'File') nome da parte do
+ *                      form-data que carrega o XML.
+ *   - login            (string, opcional) usuário da autenticação; quando
+ *                      vazio usa o cnpj/cpf do config. Só dígitos são aceitos.
+ *   - senha            (string, obrigatório) senha do sistema.
+ *   - cnpj | cpf, razaosocial, im, siglaUF — dados do emissor.
+ *   - cod_tom_municipio (string|int) código TOM do município do prestador,
+ *                      usado pelas factories no XML.
+ *   - teste            (0|1) liga a tag <nfse_teste> (teste de integração).
+ *   - versao           (opcional) 1 ou 100 — ambos resolvem para v100.
+ *
+ * Nenhum dado de credencial é gravado em {@see getLastRequest()} nem em
+ * mensagens de exceção: o header Authorization e o Cookie saem redigidos.
  *
  * @category  NFePHP
  * @package   NFePHP\NFSe\Models\IPM
- * @copyright NFePHP Copyright (c) 2016
  * @license   http://www.gnu.org/licenses/lgpl.txt LGPLv3+
  * @license   https://opensource.org/licenses/MIT MIT
  * @license   http://www.gnu.org/licenses/gpl.txt GPLv3+
- * @author    Maykon da S. de Siqueira <maykon at multilig dot com dot br>
- * @link      http://github.com/nfephp-org/sped-nfse for the canonical source repository
  */
-
 class Tools extends ToolsBase
 {
-    protected $url = "";
+    /** Única versão de layout existente para o modelo IPM (Factories\v100). */
+    public const VERSAO = 100;
+
+    /** Template oficial da URL (NTE 35/2021 v2.9, Tabela 1). */
+    public const URL_TEMPLATE = 'https://{cidade}.atende.net/?pg=rest&service=WNERestServiceNFSe';
 
     /**
-     * Constructor
-     * @param stdClass $config
-     * @param \NFePHP\Common\Certificate $certificate
+     * Nome padrão da parte multipart que carrega o XML.
+     * A NTE só diz "alterar a Key para File" (§4.14, Postman); por isso é
+     * configurável via $config->multipart_field.
      */
-    public function __construct(stdClass $config, Certificate $certificate = null)
+    public const MULTIPART_FIELD = 'File';
+
+    /** Nome do cookie de sessão devolvido pelo Atende.Net. */
+    public const SESSION_COOKIE = 'PHPSESSID';
+
+    protected $versao = self::VERSAO;
+
+    /** Timeout (s) para requisições HTTP ao Atende.Net. */
+    protected int $timeout = 60;
+
+    /**
+     * Slug padrão do município, para subclasses de município
+     * (ex.: Counties\M4105805). O $config->city_slug tem precedência.
+     */
+    protected $citySlug = '';
+
+    /** Identificador de sessão (valor do cookie PHPSESSID) capturado da última resposta. */
+    protected ?string $sessionId = null;
+
+    /**
+     * Registro da última requisição HTTP enviada, já sem credenciais.
+     *
+     * @var array{method: string, url: string, headers: array<int, string>, multipartField: string, bodyLength: int, httpCode: int}|null
+     */
+    protected ?array $lastRequest = null;
+
+    /**
+     * @param stdClass                          $config
+     * @param \NFePHP\Common\Certificate|null   $certificate opcional: o Atende.Net não exige
+     *                                                       certificado; quando presente o XML é assinado.
+     */
+    public function __construct(stdClass $config, ?Certificate $certificate = null)
     {
         $this->config = $config;
+        $this->certificate = $certificate;
 
-        //Se o model já possuia  versão não tem necessidade de pegar da configuração
-        if (empty($this->versao)) {
-            $this->versao = $config->versao;
-        }
+        $this->versao = $this->normalizeVersao($config->versao ?? $this->versao);
 
-        $this->remetenteCNPJCPF = $config->cpf;
-        $this->remetenteRazao = $config->razaosocial;
-        $this->remetenteIM = $config->im;
+        $this->remetenteCNPJCPF = (string) ($config->cpf ?? '');
+        $this->remetenteRazao = (string) ($config->razaosocial ?? '');
+        $this->remetenteIM = (string) ($config->im ?? '');
         $this->remetenteTipoDoc = 1;
-        if ($config->cnpj != '') {
-            $this->remetenteCNPJCPF = $config->cnpj;
+        if (!empty($config->cnpj)) {
+            $this->remetenteCNPJCPF = (string) $config->cnpj;
             $this->remetenteTipoDoc = 2;
         }
-        $this->certificate = $certificate;
-        $this->timezone = DateTime::tzdBR($config->siglaUF);
 
+        // DateTime::tzdBR() chama date_default_timezone_set() (efeito global no
+        // processo do consumidor); aqui só resolvemos o fuso, sem alterar o padrão.
+        $uf = strtoupper((string) ($config->siglaUF ?? ''));
+        $this->timezone = new \DateTimeZone(DateTime::$tzUFlist[$uf] ?? 'America/Sao_Paulo');
 
-        if (empty($this->versao)) {
-            throw new \LogicException('Informe a versão do modelo.');
+        // Padrões usados pelas factories, para o consumidor não precisar
+        // repetir o que a subclasse de município já sabe.
+        if (empty($this->config->cod_tom_municipio) && (int) $this->codcidade > 0) {
+            $this->config->cod_tom_municipio = $this->codcidade;
+        }
+        if (!isset($this->config->teste)) {
+            $this->config->teste = 0;
         }
 
-        $this->setUrlIPM();
+        // Falha cedo se a URL não puder ser montada (slug ausente, template inválido).
+        $this->getUrl();
     }
 
-    protected function setUrlIPM()
+    // =========================================================================
+    // Configuração pública
+    // =========================================================================
+
+    /**
+     * Define timeout em segundos para requisições ao Atende.Net.
+     */
+    public function setTimeout(int $seconds): void
     {
-        $url = "http://sync%s.nfs-e.net/datacenter/include/nfw/importa_nfw/nfw_import_upload.php";
-
-        #http://www.fazenda.mg.gov.br/governo/assuntos_municipais/codigomunicipio/codmunicoutest_(rs|pr|sc).html
-        $subUrl = '';
-        #boa esperanca do iguacu [5471] / cascavel [7493] / Rio Negro [7823]
-        if (in_array($this->config->cod_tom_municipio, [5471, 7493, 7823])) {
-            $subUrl = '-pr';
-        }
-
-        #barra bonita [0894] / gravatal [8121] / paraiso [5747] / santa rosa do sul [8307] / seara [8345]
-        if (in_array($this->config->cod_tom_municipio, ['0894', 8121, 5747, 8307, 8345])) {
-            $subUrl = '-sc';
-        }
-
-        #Campo Novo [8579] / Esperança do Sul [0980] / Novo Hamburgo [8771] / Palmeira das Missões [8777] / Rolante [8823] / São João do Polêsine [5791]
-        if (in_array($this->config->cod_tom_municipio, [8579, '0980', 8771, 8777, 8823, 5791])) {
-            $subUrl = '-rs';
-        }
-
-        $this->url = sprintf($url, $subUrl);
+        $this->timeout = max(5, $seconds);
     }
 
     /**
-     * Emitir nota de servico
+     * Identificador de sessão (PHPSESSID) capturado da última resposta,
+     * para o consumidor persistir entre requisições/processos se quiser.
+     */
+    public function getSessionId(): ?string
+    {
+        return $this->sessionId;
+    }
+
+    /**
+     * Reaproveita um identificador de sessão obtido anteriormente.
+     * Passe null para forçar a abertura de uma sessão nova.
+     */
+    public function setSessionId(?string $sessionId): void
+    {
+        $sessionId = $sessionId !== null ? trim($sessionId) : null;
+        $this->sessionId = ($sessionId === '' || $sessionId === null) ? null : $sessionId;
+    }
+
+    /**
+     * Retorna o registro da última requisição enviada (método, URL, headers
+     * redigidos, tamanho do corpo e status HTTP). Nunca contém credenciais.
+     */
+    public function getLastRequest(): ?array
+    {
+        return $this->lastRequest;
+    }
+
+    /**
+     * URL do webservice do município do prestador, montada a cada chamada
+     * (não há estado acumulado entre requisições).
+     */
+    public function getUrl(): string
+    {
+        $template = trim((string) ($this->config->url_template ?? ''));
+        if ($template === '') {
+            $template = self::URL_TEMPLATE;
+        }
+
+        if (strpos($template, '{cidade}') === false) {
+            return $template;
+        }
+
+        $slug = self::normalizeCitySlug((string) ($this->config->city_slug ?? $this->citySlug));
+        if ($slug === '') {
+            throw new RuntimeException(
+                'Atende.Net: informe $config->city_slug com o nome do município do prestador '
+                . '(sem pontuação e sem espaços), usado em ' . self::URL_TEMPLATE
+            );
+        }
+
+        return str_replace('{cidade}', $slug, $template);
+    }
+
+    /**
+     * Normaliza o nome do município para o subdomínio do Atende.Net:
+     * minúsculas, sem acentos, sem pontuação e sem espaços.
+     * Ex.: "São José dos Pinhais" → "saojosedospinhais".
+     */
+    public static function normalizeCitySlug(string $city): string
+    {
+        $map = [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a', 'ä' => 'a',
+            'Á' => 'a', 'À' => 'a', 'Ã' => 'a', 'Â' => 'a', 'Ä' => 'a',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'É' => 'e', 'È' => 'e', 'Ê' => 'e', 'Ë' => 'e',
+            'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+            'Í' => 'i', 'Ì' => 'i', 'Î' => 'i', 'Ï' => 'i',
+            'ó' => 'o', 'ò' => 'o', 'õ' => 'o', 'ô' => 'o', 'ö' => 'o',
+            'Ó' => 'o', 'Ò' => 'o', 'Õ' => 'o', 'Ô' => 'o', 'Ö' => 'o',
+            'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+            'Ú' => 'u', 'Ù' => 'u', 'Û' => 'u', 'Ü' => 'u',
+            'ç' => 'c', 'Ç' => 'c', 'ñ' => 'n', 'Ñ' => 'n',
+        ];
+
+        $slug = strtolower(strtr(trim($city), $map));
+
+        return (string) preg_replace('/[^a-z0-9]/', '', $slug);
+    }
+
+    // =========================================================================
+    // Operações (uma nota por XML, síncronas)
+    // =========================================================================
+
+    /**
+     * Emitir nota de serviço.
+     *
      * @param Rps $rps
-     * @return string
+     * @return string XML <retorno> bruto (ver {@see Response::read()})
      */
-    public function gerarNota($rps)
+    public function gerarNota($rps): string
     {
-        $class = "NFePHP\\NFSe\\Models\\IPM\\Factories\\v{$this->versao}\\GerarNota";
-        $this->method = "gerarNota";
+        $class = $this->factoryClass('GerarNota');
+        $this->method = 'gerarNota';
 
-        $this->url .= "?eletron=1";
-        $fact       = new $class($this->certificate);
-        $message    = $fact->render($rps, $this->config);
+        $fact = new $class($this->certificate);
+        $message = $fact->render($rps, $this->config);
+
         return $this->sendRequest('', $message);
     }
 
     /**
-     * Cancelar um nota de servico
+     * Cancelar uma nota de serviço.
+     *
      * @param CancelarRps $rps
-     * @return string
+     * @return string XML <retorno> bruto (ver {@see Response::read()})
      */
-    public function cancelarNota($rps)
+    public function cancelarNota($rps): string
     {
-        $class = "NFePHP\\NFSe\\Models\\IPM\\Factories\\v{$this->versao}\\CancelarNota";
-        $this->method = "cancelarNota";
+        $class = $this->factoryClass('CancelarNota');
+        $this->method = 'cancelarNota';
 
-        $this->url .= "?eletron=1";
-        $fact       = new $class($this->certificate);
-        $message    = $fact->render($rps, $this->config);
+        $fact = new $class($this->certificate);
+        $message = $fact->render($rps, $this->config);
+
         return $this->sendRequest('', $message);
     }
 
     /**
-     * Solicitar o cancelamento de nota de servico
-     * Se informado pode ser utilizado por cancelamento por substituicao
+     * Solicitar o cancelamento de nota(s) de serviço ao município
+     * (passa pela análise do fiscal). Pode indicar nota substituta.
+     *
      * @param CancelarRps $rps
-     * @return string
+     * @return string XML <retorno> bruto (ver {@see Response::readSolicitacaoCancelamento()})
      */
-    public function solicitarCancelamentoNota($rps)
+    public function solicitarCancelamentoNota($rps): string
     {
-        $class = "NFePHP\\NFSe\\Models\\IPM\\Factories\\v{$this->versao}\\SolicitarCancelamentoNota";
-        $this->method = "solicitarCancelamentoNota";
+        $class = $this->factoryClass('SolicitarCancelamentoNota');
+        $this->method = 'solicitarCancelamentoNota';
 
-        $this->url .= "?eletron=1";
-        $fact       = new $class($this->certificate);
-        $message    = $fact->render($rps, $this->config);
+        $fact = new $class($this->certificate);
+        $message = $fact->render($rps, $this->config);
+
         return $this->sendRequest('', $message);
     }
 
     /**
-     * Consultar pelo codigo de autenticidade da Nfse
+     * Consultar pelo código de autenticidade da NFS-e.
+     *
+     * @param string $codigoAutenticidade
+     * @return string XML bruto
+     */
+    public function consultarByCodigoAutenticidade($codigoAutenticidade): string
+    {
+        $class = $this->factoryClass('ConsultarCodigoAutenticidade');
+        $this->method = 'consultarByCodigoAutenticidade';
+
+        $fact = new $class($this->certificate);
+        $message = $fact->render((string) $codigoAutenticidade);
+
+        return $this->sendRequest('', $message);
+    }
+
+    /**
+     * @deprecated Nome com erro de digitação; use {@see consultarByCodigoAutenticidade()}.
+     *
      * @param string $codigoAutenticidade
      * @return string
      */
-    public function consultarByCodigoAutentticidade($codigoAutenticidade)
+    public function consultarByCodigoAutentticidade($codigoAutenticidade): string
     {
-        $class = "NFePHP\\NFSe\\Models\\IPM\\Factories\\v{$this->versao}\\ConsultarCodigoAutenticidade";
-        $this->method = "consultarByCodigoAutentticidade";
-
-        $this->url .= "?formato_saida=2";
-        $fact       = new $class($this->certificate);
-        $message    = $fact->render($codigoAutenticidade);
-        return $this->sendRequest('', $message);
+        return $this->consultarByCodigoAutenticidade($codigoAutenticidade);
     }
 
-
     /**
-     * Consultar pelo codigo TOM do municipio numero e serie RPS
-     * @param int $cidade
-     * @param int $serie
-     * @param int $numero
-     * @return string
+     * Consultar pelo código TOM do município, série e número do RPS.
+     *
+     * @param int|string $cidade
+     * @param int|string $serie
+     * @param int|string $numero
+     * @return string XML bruto
      */
-    public function consultarByCidadeSerieNumeroRps($cidade, $serie, $numero)
+    public function consultarByCidadeSerieNumeroRps($cidade, $serie, $numero): string
     {
-        $class = "NFePHP\\NFSe\\Models\\IPM\\Factories\\v{$this->versao}\\ConsultarCidadeSerieNumeroRps";
-        $this->method = "consultarByCidadeSerieNumeroRps";
+        $class = $this->factoryClass('ConsultarCidadeSerieNumeroRps');
+        $this->method = 'consultarByCidadeSerieNumeroRps';
 
-        $this->url .= "?formato_saida=2";
-        $fact       = new $class($this->certificate);
-        $message    = $fact->render($cidade, $serie, $numero);
+        $fact = new $class($this->certificate);
+        $message = $fact->render($cidade, $serie, $numero);
+
         return $this->sendRequest('', $message);
     }
 
     /**
-     * Consultar pelo cadastro economico do prestador com numero e serie da nfse
-     * @param int $numero
-     * @param int $serie
-     * @return int $cadastro
+     * Consultar pelo cadastro econômico do prestador com número e série da NFS-e.
+     *
+     * @param int|string $numero
+     * @param int|string $serie
+     * @param int|string $cadastro
+     * @return string XML bruto
      */
-    public function consultarByConsultarNumeroSerieCadastro($numero, $serie, $cadastro)
+    public function consultarByConsultarNumeroSerieCadastro($numero, $serie, $cadastro): string
     {
-        $class = "NFePHP\\NFSe\\Models\\IPM\\Factories\\v{$this->versao}\\ConsultarNumeroSerieCadastro";
-        $this->method = "consultarByConsultarNumeroSerieCadastro";
+        $class = $this->factoryClass('ConsultarNumeroSerieCadastro');
+        $this->method = 'consultarByConsultarNumeroSerieCadastro';
 
-        $this->url .= "?formato_saida=2";
-        $fact       = new $class($this->certificate);
-        $message    = $fact->render($numero, $serie, $cadastro);
+        $fact = new $class($this->certificate);
+        $message = $fact->render($numero, $serie, $cadastro);
+
         return $this->sendRequest('', $message);
     }
 
+    // =========================================================================
+    // Transporte HTTP (cURL, multipart/form-data, Basic Auth, sessão)
+    // =========================================================================
+
     /**
-     * Send request to webservice
-     * @param string $message
-     * @return string
+     * Satisfaz o contrato abstrato Common\Tools::sendRequest.
+     *
+     * A URL é sempre montada por município ({@see getUrl()}); um $url não vazio
+     * é aceito apenas como sobrescrita explícita pontual.
+     *
+     * @param string $url
+     * @param string $message XML a enviar
+     * @return string corpo XML da resposta
      */
-    protected function sendRequest($url, $message)
+    protected function sendRequest($url, $message): string
     {
-        $this->xmlRequest = $message;
-        
-        try {
-            #cria o arquivo com o conteudo xml
-            $tmpfname = tempnam(sys_get_temp_dir(), "xml");
-            $handle   = fopen($tmpfname, "w");
-            fwrite($handle, $message);
-            fclose($handle);
+        return $this->httpRequest((string) $message, (string) $url);
+    }
 
-            $arquivo = curl_file_create($tmpfname);
+    /**
+     * Envia o XML ao Atende.Net como a única parte de um POST multipart/form-data.
+     *
+     * A biblioteca antiga acrescentava "?eletron=1" (emissão/cancelamento) e
+     * "?formato_saida=2" (consultas) à URL; nenhuma das duas consta na NTE 2.9,
+     * por isso foram removidas.
+     * // A CONFIRMAR: se alguma consulta do Atende.Net exigir formato_saida=2,
+     * //              acrescente via $config->url_template, nunca com ".=" na URL.
+     *
+     * @param string $xml XML da operação
+     * @param string $urlOverride URL explícita (vazio = montar pelo município)
+     * @return string corpo da resposta (XML <retorno>)
+     * @throws RuntimeException em erro de rede, HTTP >= 400 ou corpo que não é XML
+     */
+    protected function httpRequest(string $xml, string $urlOverride = ''): string
+    {
+        $url = $urlOverride !== '' ? $urlOverride : $this->getUrl();
+        $field = $this->multipartField();
+        $headers = $this->requestHeaders();
 
-            $data['login']  = $this->config->login;
-            $data['senha']  = $this->config->senha;
-            $data['cidade'] = $this->config->cod_tom_municipio;
-            $data['f1']     = $arquivo;
+        $options = [
+            CURLOPT_URL => $url,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => [
+                $field => new CURLStringFile($xml, 'nfse.xml', 'text/xml'),
+            ],
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HEADER => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ];
 
-            $action = '';
-            //Realiza a request REST
-            $response = $this->soap->send(
-                $this->url,
-                $this->method,
-                $action,
-                $this->soapversion,
-                $data,
-                $this->namespaces,
-                ''
+        $result = $this->executeCurl($options);
+
+        $httpCode = (int) $result['httpCode'];
+        $body = (string) $result['body'];
+        $rawHeaders = (string) $result['headers'];
+
+        $this->xmlRequest = $xml;
+        $this->lastRequest = [
+            'method' => 'POST',
+            'url' => $url,
+            'headers' => $this->redactHeaders($headers),
+            'multipartField' => $field,
+            'bodyLength' => strlen($xml),
+            'httpCode' => $httpCode,
+        ];
+
+        if ((int) $result['errno'] !== 0) {
+            throw new RuntimeException(
+                "Erro cURL ao comunicar com Atende.Net (POST {$url}): [{$result['errno']}] {$result['error']}"
             );
-
-            return $response;
-        } catch (\Throwable $th) {
-            throw $th;
-        } finally {
-            #com sucesso ou com erro, sempre apagar o arquivo temporario na propria request
-            unlink($tmpfname);
         }
+
+        $this->captureSessionCookie($rawHeaders);
+
+        if ($httpCode >= 400 && !$this->looksLikeRetornoXml($body)) {
+            throw new RuntimeException(
+                "Atende.Net retornou HTTP {$httpCode} em POST {$url}: " . $this->excerpt($body)
+            );
+        }
+
+        if ($httpCode === 0) {
+            throw new RuntimeException("Atende.Net não devolveu resposta HTTP em POST {$url}.");
+        }
+
+        if (!$this->looksLikeRetornoXml($body)) {
+            throw new RuntimeException(
+                "Atende.Net retornou HTTP {$httpCode} em POST {$url} com conteúdo que não é o XML esperado "
+                . '(provável página HTML de login ou erro do servidor): ' . $this->excerpt($body)
+            );
+        }
+
+        return $body;
+    }
+
+    /**
+     * Executa o cURL. Isolado para os testes substituírem por subclasse
+     * (sem bater na rede). Recebe as opções prontas e devolve o resultado cru.
+     *
+     * @param array<int, mixed> $options opções para curl_setopt_array
+     * @return array{body: string, headers: string, httpCode: int, errno: int, error: string}
+     */
+    protected function executeCurl(array $options): array
+    {
+        $ch = curl_init();
+        curl_setopt_array($ch, $options);
+
+        $raw = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        curl_close($ch);
+
+        $raw = is_string($raw) ? $raw : '';
+
+        return [
+            'body' => substr($raw, $headerSize) ?: '',
+            'headers' => substr($raw, 0, $headerSize) ?: '',
+            'httpCode' => $httpCode,
+            'errno' => (int) $errno,
+            'error' => (string) $error,
+        ];
+    }
+
+    /**
+     * Headers da requisição: Basic Auth, cookie de sessão (quando houver),
+     * Accept, e "Expect:" vazio para não esperar o 100-continue do multipart.
+     *
+     * @return array<int, string>
+     */
+    protected function requestHeaders(): array
+    {
+        $headers = [
+            'Authorization: Basic ' . base64_encode($this->authUsername() . ':' . $this->authPassword()),
+            'Accept: text/xml, application/xml;q=0.9, */*;q=0.8',
+            'Expect:',
+        ];
+
+        if ($this->sessionId !== null) {
+            $headers[] = 'Cookie: ' . self::SESSION_COOKIE . '=' . $this->sessionId;
+        }
+
+        return $headers;
+    }
+
+    /**
+     * Username da autenticação: CPF/CNPJ do emissor contendo apenas dígitos
+     * (o webservice devolve [144] se houver outro caractere).
+     */
+    protected function authUsername(): string
+    {
+        $login = trim((string) ($this->config->login ?? ''));
+        if ($login === '') {
+            $login = (string) $this->remetenteCNPJCPF;
+        }
+
+        $digits = (string) preg_replace('/[.\/\-\s]/', '', $login);
+        if ($digits === '' || !ctype_digit($digits)) {
+            throw new RuntimeException(
+                'Atende.Net: o usuário da autenticação deve ser o CPF/CNPJ do emissor contendo apenas números '
+                . '(erro [144] do webservice). Informe $config->login com o CPF/CNPJ ou deixe em branco '
+                . 'para usar $config->cnpj / $config->cpf.'
+            );
+        }
+
+        return $digits;
+    }
+
+    protected function authPassword(): string
+    {
+        $password = (string) ($this->config->senha ?? '');
+        if ($password === '') {
+            throw new RuntimeException('Atende.Net: informe $config->senha (senha de acesso ao sistema).');
+        }
+
+        return $password;
+    }
+
+    protected function multipartField(): string
+    {
+        $field = trim((string) ($this->config->multipart_field ?? ''));
+
+        return $field !== '' ? $field : self::MULTIPART_FIELD;
+    }
+
+    /**
+     * Remove credenciais dos headers antes de registrá-los em $lastRequest.
+     *
+     * @param array<int, string> $headers
+     * @return array<int, string>
+     */
+    protected function redactHeaders(array $headers): array
+    {
+        return array_map(static function (string $header): string {
+            if (stripos($header, 'Authorization:') === 0) {
+                return 'Authorization: Basic ***';
+            }
+            if (stripos($header, 'Cookie:') === 0) {
+                return 'Cookie: ' . self::SESSION_COOKIE . '=***';
+            }
+
+            return $header;
+        }, $headers);
+    }
+
+    /**
+     * Guarda o PHPSESSID devolvido em Set-Cookie para reenviar nas próximas requisições.
+     */
+    protected function captureSessionCookie(string $rawHeaders): void
+    {
+        if ($rawHeaders === '') {
+            return;
+        }
+
+        $pattern = '/^Set-Cookie:\s*' . preg_quote(self::SESSION_COOKIE, '/') . '=([^;\r\n]+)/mi';
+        if (preg_match_all($pattern, $rawHeaders, $matches) && !empty($matches[1])) {
+            $value = trim((string) end($matches[1]));
+            if ($value !== '') {
+                $this->sessionId = $value;
+            }
+        }
+    }
+
+    /**
+     * A NTE define o retorno como XML com raiz <retorno>; a consulta (§4.7)
+     * devolve "o XML da nota", cuja raiz pode ser <nfse>. Qualquer outra coisa
+     * (HTML de login, erro do servidor) não é resposta válida.
+     */
+    protected function looksLikeRetornoXml(string $body): bool
+    {
+        $trimmed = ltrim((string) preg_replace('/^\xEF\xBB\xBF/', '', ltrim($body)));
+        if ($trimmed === '' || $trimmed[0] !== '<') {
+            return false;
+        }
+
+        return (bool) preg_match('/<(retorno|nfse)[\s>\/]/i', substr($trimmed, 0, 512));
+    }
+
+    protected function excerpt(string $body, int $length = 500): string
+    {
+        $flat = trim((string) preg_replace('/\s+/', ' ', $body));
+
+        return substr($flat, 0, $length);
+    }
+
+    // =========================================================================
+    // Versão / factories
+    // =========================================================================
+
+    /**
+     * Só existe a v100. Aceita 1 e 100 (o example antigo mandava "versao" => 1,
+     * que resolveria para Factories\v1 — inexistente); qualquer outro valor falha.
+     *
+     * @param mixed $versao
+     */
+    protected function normalizeVersao($versao): int
+    {
+        if ($versao === null || $versao === '') {
+            return self::VERSAO;
+        }
+
+        $int = (int) $versao;
+        if ($int === 1 || $int === self::VERSAO) {
+            return self::VERSAO;
+        }
+
+        throw new \LogicException(
+            "Versão '{$versao}' não suportada pelo modelo IPM/Atende.Net; use " . self::VERSAO . ' (ou 1).'
+        );
+    }
+
+    protected function factoryClass(string $name): string
+    {
+        $class = "NFePHP\\NFSe\\Models\\IPM\\Factories\\v{$this->versao}\\{$name}";
+        if (!class_exists($class)) {
+            throw new RuntimeException("Factory {$class} não existe para a versão {$this->versao} do modelo IPM.");
+        }
+
+        return $class;
     }
 }

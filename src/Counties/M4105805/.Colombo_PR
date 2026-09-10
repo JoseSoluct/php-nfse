@@ -2,6 +2,6 @@ Colombo PR
 IBGE: 4105805
 TOM: 7513
 SIAF: 7513
-Padrão:  REST IPM v100
-URL Homologação: http://sync.nfs-e.net/datacenter/include/nfw/importa_nfw/nfw_import_upload.php
-URL Produção:http://sync.nfs-e.net/datacenter/include/nfw/importa_nfw/nfw_import_upload.php
+Padrão:  REST IPM/Atende.Net v100 (NTE 35/2021 v2.9)
+URL Homologação: https://colombo.atende.net/?pg=rest&service=WNERestServiceNFSe (mesma URL; teste via <nfse_teste>1</nfse_teste>)
+URL Produção: https://colombo.atende.net/?pg=rest&service=WNERestServiceNFSe

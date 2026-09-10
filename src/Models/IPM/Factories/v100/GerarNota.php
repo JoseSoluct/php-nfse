@@ -2,10 +2,10 @@
 
 namespace NFePHP\NFSe\Models\IPM\Factories\v100;
 
-use Exception;
 use InvalidArgumentException;
 use stdClass;
 use NFePHP\NFSe\Models\IPM\Rps;
+use NFePHP\NFSe\Models\IPM\ItensRps;
 use NFePHP\NFSe\Common\DOMImproved as Dom;
 use NFePHP\NFSe\Models\IPM\Factories\Signer;
 use NFePHP\NFSe\Models\IPM\Factories\Factory;
@@ -13,10 +13,21 @@ use NFePHP\NFSe\Models\IPM\Factories\Factory;
 class GerarNota extends Factory
 {
     /**
-     * Método usado para gerar o XML do Soap Request
-     * @param $versao
-     * @param $rpss
+     * Monta o XML de emissão de NFS-e conforme a NTE 35/2021 v2.9 (Tabela 4) do Atende.Net.
+     *
+     * Tags obrigatórias ($obrigatorio = true) entram em $dom->errors quando vazias e o
+     * render() lança InvalidArgumentException antes de assinar. As demais saem vazias quando
+     * não informadas ($force = true), preservando o formato de fio aceito pelo webservice.
+     *
+     * A soma das parcelas de <forma_pagamento> NÃO é validada aqui: pela Tabela 4 ela deve
+     * bater com <valor_tributavel> descontados <valor_deducao> e <valor_issrf> "quando a
+     * situação tributária permitir" — regra que depende da situação tributária de cada item
+     * (§4.9) e que só a aplicação conhece; o webservice responde [270] quando divergir.
+     *
+     * @param Rps $rps
+     * @param stdClass $config - usa teste, trabalha_com_rps, cod_tom_municipio e encoding (UTF-8|ISO-8859-1)
      * @return string
+     * @throws InvalidArgumentException
      */
     public function render(
         Rps $rps,
@@ -33,12 +44,13 @@ class GerarNota extends Factory
         //Adiciona as tags ao DOM
         $dom->appendChild($root);
 
-        if($config->teste) {
+        //§4.8: <nfse_teste> com conteúdo "1" logo após a tag geral
+        if (!empty($config->teste)) {
             $dom->addChild(
                 $root,
                 'nfse_teste',
                 1,
-                true,
+                false,
                 "Definir como teste de integração",
                 true
             );
@@ -49,21 +61,21 @@ class GerarNota extends Factory
                 $root,
                 'identificador',
                 $rps->infIdentificador,
-                true,
+                false,
                 "Identificador do arquivo a ser processado",
                 true
             );
         }
 
-        if ($config->trabalha_com_rps) {
+        if (!empty($config->trabalha_com_rps)) {
             //Cria o elemento rps se a prefeitura trabalha com rps
             $rpsE = $dom->createElement('rps');
 
             $dom->addChild(
                 $rpsE,
                 'nro_recibo_provisorio',
-                $rps->infNumero,
-                true,
+                $rps->infNumero ?? '',
+                false,
                 "Número do Rps",
                 true
             );
@@ -71,9 +83,9 @@ class GerarNota extends Factory
             $dom->addChild(
                 $rpsE,
                 'serie_recibo_provisorio',
-                $rps->infSerie,
-                true,
-                "Número do Rps",
+                $rps->infSerie ?? '',
+                false,
+                "Série do Rps",
                 true
             );
 
@@ -81,7 +93,7 @@ class GerarNota extends Factory
                 $rpsE,
                 'data_emissao_recibo_provisorio',
                 $rps->infDataEmissao->format('d/m/Y'),
-                true,
+                false,
                 "Data de emissão do Rps",
                 true
             );
@@ -90,7 +102,7 @@ class GerarNota extends Factory
                 $rpsE,
                 'hora_emissao_recibo_provisorio',
                 $rps->infDataEmissao->format('H:i:s'),
-                true,
+                false,
                 "Hora de emissão do Rps",
                 true
             );
@@ -107,7 +119,7 @@ class GerarNota extends Factory
                 $pedagio,
                 'cod_equipamento_automatico',
                 $rps->infPedagio['cod_equipamento_automatico'],
-                true,
+                false,
                 "Código do equipamento eletrônico do pedágio",
                 true
             );
@@ -119,12 +131,24 @@ class GerarNota extends Factory
         //Cria o elemento nf
         $nf = $dom->createElement('nf');
 
+        //Tabela 4: <serie_nfse> é a primeira tag de <nf>; só sai quando informada
+        if ($rps->infSerieNfse !== null && $rps->infSerieNfse !== '') {
+            $dom->addChild(
+                $nf,
+                'serie_nfse',
+                $rps->infSerieNfse,
+                false,
+                "Série da NFS-e",
+                true
+            );
+        }
+
         $dom->addChild(
             $nf,
             'data_fato_gerador',
             $rps->infDataFatoGerador->format('d/m/Y'),
             true,
-            "Data do fator gerador da nota fiscal",
+            "Data do fato gerador da nota fiscal",
             true
         );
 
@@ -140,8 +164,8 @@ class GerarNota extends Factory
         $dom->addChild(
             $nf,
             'valor_desconto',
-            $rps->infValorDesconto,
-            true,
+            $rps->infValorDesconto ?? '',
+            false,
             "Valor desconto da nota fiscal",
             true
         );
@@ -149,8 +173,8 @@ class GerarNota extends Factory
         $dom->addChild(
             $nf,
             'valor_ir',
-            $rps->infValorIr,
-            true,
+            $rps->infValorIr ?? '',
+            false,
             "Valor do imposto de renda retido da nota fiscal",
             true
         );
@@ -158,8 +182,8 @@ class GerarNota extends Factory
         $dom->addChild(
             $nf,
             'valor_inss',
-            $rps->infValorInss,
-            true,
+            $rps->infValorInss ?? '',
+            false,
             "Valor do INSS nota fiscal",
             true
         );
@@ -167,17 +191,17 @@ class GerarNota extends Factory
         $dom->addChild(
             $nf,
             'valor_contribuicao_social',
-            $rps->infValorContribuicaoSocial,
-            true,
-            "Valor da contrinuicao Social nota fiscal",
+            $rps->infValorContribuicaoSocial ?? '',
+            false,
+            "Valor da contribuição social nota fiscal",
             true
         );
 
         $dom->addChild(
             $nf,
             'valor_rps',
-            $rps->infValorRps,
-            true,
+            $rps->infValorRps ?? '',
+            false,
             "Valor de retenções da previdência social nota fiscal",
             true
         );
@@ -185,8 +209,8 @@ class GerarNota extends Factory
         $dom->addChild(
             $nf,
             'valor_pis',
-            $rps->infValorPis,
-            true,
+            $rps->infValorPis ?? '',
+            false,
             "Valor do PIS nota fiscal",
             true
         );
@@ -194,8 +218,8 @@ class GerarNota extends Factory
         $dom->addChild(
             $nf,
             'valor_cofins',
-            $rps->infValorCofins,
-            true,
+            $rps->infValorCofins ?? '',
+            false,
             "Valor do COFINS nota fiscal",
             true
         );
@@ -203,8 +227,8 @@ class GerarNota extends Factory
         $dom->addChild(
             $nf,
             'observacao',
-            $rps->infObservacao,
-            true,
+            $rps->infObservacao ?? '',
+            false,
             "Observações nota fiscal",
             true
         );
@@ -227,7 +251,7 @@ class GerarNota extends Factory
         $dom->addChild(
             $prestador,
             'cidade',
-            $config->cod_tom_municipio,
+            $config->cod_tom_municipio ?? '',
             true,
             "Código tom do municipio do emissor da nota",
             true
@@ -243,7 +267,7 @@ class GerarNota extends Factory
             $tomador,
             'endereco_informado',
             $rps->infTomadorEndereco['endereco_informado'],
-            true,
+            false,
             "Define se apresenta o endereco do tomador na nota",
             true
         );
@@ -258,15 +282,15 @@ class GerarNota extends Factory
         );
 
         if ($rps->infTomadorEstrangeiro) {
-            if ($rps->infTomador['tipo'] != 'E') {
+            if ($rps->infTomador['tipo'] != Rps::TOMADORES) {
                 throw new InvalidArgumentException("Definido informações de tomador estrangeiro para tomador diferente de 'E'");
             }
             $dom->addChild(
                 $tomador,
                 'identificador',
                 $rps->infTomadorEstrangeiro['identificador'],
-                true,
-                "Numero do cartao de identificacao  estrangeira ou passaporte",
+                false,
+                "Numero do cartao de identificacao estrangeira ou passaporte",
                 true
             );
 
@@ -274,7 +298,7 @@ class GerarNota extends Factory
                 $tomador,
                 'estado',
                 $rps->infTomadorEstrangeiro['estado'],
-                true,
+                false,
                 "Estado de origem do tomador estrangeiro",
                 true
             );
@@ -283,7 +307,7 @@ class GerarNota extends Factory
                 $tomador,
                 'pais',
                 $rps->infTomadorEstrangeiro['pais'],
-                true,
+                false,
                 "Pais de origem do tomador estrangeiro",
                 true
             );
@@ -293,7 +317,7 @@ class GerarNota extends Factory
             $tomador,
             'cpfcnpj',
             $rps->infTomador['cpfcnpj'],
-            true,
+            false,
             "CPF/Cnpj do tomador",
             true
         );
@@ -302,7 +326,7 @@ class GerarNota extends Factory
             $tomador,
             'ie',
             $rps->infTomador['ie'],
-            true,
+            false,
             "Inscrição Estadual do tomador",
             true
         );
@@ -320,7 +344,7 @@ class GerarNota extends Factory
             $tomador,
             'sobrenome_nome_fantasia',
             $rps->infTomador['sobrenome_nome_fantasia'],
-            true,
+            false,
             "Sobrenome ou nome fantasia do tomador",
             true
         );
@@ -329,7 +353,7 @@ class GerarNota extends Factory
             $tomador,
             'logradouro',
             $rps->infTomadorEndereco['logradouro'],
-            true,
+            false,
             "Logradouro do endereço do tomador",
             true
         );
@@ -338,8 +362,8 @@ class GerarNota extends Factory
             $tomador,
             'email',
             $rps->infTomador['email'],
-            true,
-            "Emails do tomador, quando necessário informar os emals separados por ;",
+            false,
+            "Emails do tomador, quando necessário informar os emails separados por ;",
             true
         );
 
@@ -347,7 +371,7 @@ class GerarNota extends Factory
             $tomador,
             'numero_residencia',
             $rps->infTomadorEndereco['numero_residencia'],
-            true,
+            false,
             "Número do endereço do tomador",
             true
         );
@@ -356,7 +380,7 @@ class GerarNota extends Factory
             $tomador,
             'complemento',
             $rps->infTomadorEndereco['complemento'],
-            true,
+            false,
             "Complemento do endereço do tomador",
             true
         );
@@ -365,7 +389,7 @@ class GerarNota extends Factory
             $tomador,
             'ponto_referencia',
             $rps->infTomadorEndereco['ponto_referencia'],
-            true,
+            false,
             "Ponto de referência do endereço do tomador",
             true
         );
@@ -374,7 +398,7 @@ class GerarNota extends Factory
             $tomador,
             'bairro',
             $rps->infTomadorEndereco['bairro'],
-            true,
+            false,
             "Bairro do endereço do tomador",
             true
         );
@@ -383,7 +407,7 @@ class GerarNota extends Factory
             $tomador,
             'cidade',
             $rps->infTomadorEndereco['cidade'],
-            true,
+            false,
             "Código tom ou nome da cidade, se estrangeiro, do endereço do tomador",
             true
         );
@@ -392,7 +416,7 @@ class GerarNota extends Factory
             $tomador,
             'cep',
             $rps->infTomadorEndereco['cep'],
-            true,
+            false,
             "Cep do endereço do tomador",
             true
         );
@@ -401,7 +425,7 @@ class GerarNota extends Factory
             $tomador,
             'ddd_fone_comercial',
             $rps->infTomadorTelefone['ddd_fone_comercial'],
-            true,
+            false,
             "Código de área do telefone do estabelecimento do Tomador",
             true
         );
@@ -410,7 +434,7 @@ class GerarNota extends Factory
             $tomador,
             'fone_comercial',
             $rps->infTomadorTelefone['fone_comercial'],
-            true,
+            false,
             "Telefone do estabelecimento do Tomador",
             true
         );
@@ -419,7 +443,7 @@ class GerarNota extends Factory
             $tomador,
             'ddd_fone_residencial',
             $rps->infTomadorTelefone['ddd_fone_residencial'],
-            true,
+            false,
             "Código de área do telefone residencial do Tomador",
             true
         );
@@ -428,7 +452,7 @@ class GerarNota extends Factory
             $tomador,
             'fone_residencial',
             $rps->infTomadorTelefone['fone_residencial'],
-            true,
+            false,
             "Telefone residencial do Tomador",
             true
         );
@@ -437,7 +461,7 @@ class GerarNota extends Factory
             $tomador,
             'ddd_fax',
             $rps->infTomadorTelefone['ddd_fax'],
-            true,
+            false,
             "Código de área do fax do Tomador",
             true
         );
@@ -446,11 +470,10 @@ class GerarNota extends Factory
             $tomador,
             'fone_fax',
             $rps->infTomadorTelefone['fone_fax'],
-            true,
+            false,
             "Fax do Tomador",
             true
         );
-
 
         //Adiciona as tags ao DOM
         $root->appendChild($tomador);
@@ -458,10 +481,10 @@ class GerarNota extends Factory
         //Cria o elemento itens
         $itens = $dom->createElement('itens');
 
-        /** @var $item ItensRps[] */
+        /** @var ItensRps $item */
         foreach ($rps->infItens as $item) {
-            //Cria o elemento itens
-            $lista = $dom->createElement('itens');
+            //Tabela 4: cada item é um <lista> dentro de <itens>
+            $lista = $dom->createElement('lista');
 
             $dom->addChild(
                 $lista,
@@ -484,8 +507,8 @@ class GerarNota extends Factory
             $dom->addChild(
                 $lista,
                 'unidade_codigo',
-                $item->infUnidadeCodigo,
-                true,
+                $item->infUnidadeCodigo ?? '',
+                false,
                 "Codigo das unidades de serviços já cadastradas",
                 true
             );
@@ -493,8 +516,8 @@ class GerarNota extends Factory
             $dom->addChild(
                 $lista,
                 'unidade_quantidade',
-                $item->infUnidadeQuantidade,
-                true,
+                $item->infUnidadeQuantidade ?? '',
+                false,
                 "Quantidade dos serviços prestados relativo à unidade informada",
                 true
             );
@@ -502,8 +525,8 @@ class GerarNota extends Factory
             $dom->addChild(
                 $lista,
                 'unidade_valor_unitario',
-                $item->infUnidadeValorUnitario,
-                true,
+                $item->infUnidadeValorUnitario ?? '',
+                false,
                 "Valor unitario dos serviços prestados relativo à unidade informada",
                 true
             );
@@ -516,6 +539,18 @@ class GerarNota extends Factory
                 "Código do subitem da lista de serviços",
                 true
             );
+
+            //Opcional: código de atividade conforme definido no município
+            if ($item->infCodigoAtividade !== null && $item->infCodigoAtividade !== '') {
+                $dom->addChild(
+                    $lista,
+                    'codigo_atividade',
+                    $item->infCodigoAtividade,
+                    false,
+                    "Código de atividade conforme definido no município",
+                    true
+                );
+            }
 
             $dom->addChild(
                 $lista,
@@ -549,15 +584,15 @@ class GerarNota extends Factory
                 'valor_tributavel',
                 $item->infValorTributavel,
                 true,
-                "Valor do item que servirá de base de cálculo para o imposto,com a dedução aplicada, se a situação tributária permitir",
+                "Valor do serviço prestado, sem a dedução aplicada",
                 true
             );
 
             $dom->addChild(
                 $lista,
                 'valor_deducao',
-                $item->infValorDeducao,
-                true,
+                $item->infValorDeducao ?? '',
+                false,
                 "Valor da dedução, quando houver e se a situação tributária permitir",
                 true
             );
@@ -565,8 +600,8 @@ class GerarNota extends Factory
             $dom->addChild(
                 $lista,
                 'valor_issrf',
-                $item->infValorDeducao,
-                true,
+                $item->infValorIssrf ?? '',
+                false,
                 "Valor do ISS Retido na Fonte, quando houver e se a situação tributária permitir",
                 true
             );
@@ -590,7 +625,7 @@ class GerarNota extends Factory
                     $linha,
                     'titulo',
                     $generico['titulo'],
-                    true,
+                    false,
                     "Título do campo livre.",
                     true
                 );
@@ -599,13 +634,13 @@ class GerarNota extends Factory
                     $linha,
                     'descricao',
                     $generico['descricao'],
-                    true,
-                    "Contéudo do campo livre.",
+                    false,
+                    "Conteúdo do campo livre.",
                     true
                 );
 
-                //Adiciona as tags ao DOM
-                $root->appendChild($linha);
+                //Cada linha fica dentro de <genericos>
+                $genericos->appendChild($linha);
             }
             //Adiciona as tags ao DOM
             $root->appendChild($genericos);
@@ -619,8 +654,8 @@ class GerarNota extends Factory
                 $produtos,
                 'descricao',
                 $rps->infProdutos['descricao'],
-                true,
-                "Tudo que se quer que saia na nota a respeito dos produtos (quantidade, desconto, etc.) de forma agurpada",
+                false,
+                "Tudo que se quer que saia na nota a respeito dos produtos (quantidade, desconto, etc.) de forma agrupada",
                 true
             );
 
@@ -628,7 +663,7 @@ class GerarNota extends Factory
                 $produtos,
                 'valor',
                 $rps->infProdutos['valor'],
-                true,
+                false,
                 "Soma do valor dos produtos da NFS-e.",
                 true
             );
@@ -645,10 +680,23 @@ class GerarNota extends Factory
             //Cria o elemento forma_pagamento
             $forma_pagamento = $dom->createElement('forma_pagamento');
 
-            $valorTotal  = 0;
+            $dom->addChild(
+                $forma_pagamento,
+                'tipo_pagamento',
+                $rps->infFormasPagamentos['tipo_pagamento'],
+                true,
+                "Código da forma de pagamento (1 a 8)",
+                true
+            );
+
+            //Cria o agrupador parcelas, com uma <parcela> por parcela informada
+            $parcelas = $dom->createElement('parcelas');
+
             foreach ($rps->infFormasPagamentos['parcelas'] as $parcela) {
+                $parcelaE = $dom->createElement('parcela');
+
                 $dom->addChild(
-                    $forma_pagamento,
+                    $parcelaE,
                     'numero',
                     $parcela['numero'],
                     true,
@@ -657,36 +705,38 @@ class GerarNota extends Factory
                 );
 
                 $dom->addChild(
-                    $forma_pagamento,
+                    $parcelaE,
                     'valor',
                     $parcela['valor'],
                     true,
-                    "valor da parcela",
+                    "Valor da parcela",
                     true
                 );
-                $valorTotal += $parcela['valor'];
 
                 $dom->addChild(
-                    $forma_pagamento,
+                    $parcelaE,
                     'data_vencimento',
                     $parcela['data_vencimento']->format('d/m/Y'),
                     true,
-                    "Data Vencimento da parcela",
+                    "Data de vencimento da parcela",
                     true
                 );
+
+                $parcelas->appendChild($parcelaE);
             }
 
-            if ($rps->infValorTotal != $valorTotal) {
-                throw new InvalidArgumentException("A soma do valor das parcelas deve ser igual ao da tag <valor_total>");
-            }
+            $forma_pagamento->appendChild($parcelas);
+
             //Adiciona as tags ao DOM
             $root->appendChild($forma_pagamento);
         }
 
-        $body = str_replace('<?xml version="1.0" encoding="utf-8"?>', '', $dom->saveXML());
+        //Nada de XML incompleto segue para assinatura ou transmissão
+        $this->lancarErrosDoDom($dom);
+
+        $body = $this->clear($dom->saveXML());
 
         if ($this->certificate) {
-
             $body = Signer::sign(
                 $this->certificate,
                 $body,
@@ -694,13 +744,11 @@ class GerarNota extends Factory
                 'id',
                 $this->algorithm,
                 [false, false, null, null],
-                '',
-                true
+                ''
             );
         }
 
         $body = $this->clear($body);
-        #echo '<pre>'.print_r($body).'</pre>';die;
-        return '<?xml version="1.0" encoding="ISO-8859-1"?>' . $body;
+        return $this->declararEncoding($body, $config);
     }
 }
