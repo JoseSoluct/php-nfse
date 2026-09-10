@@ -62,6 +62,15 @@ class Response
         'situacao_descricao_nfse',
         'link_nfse',
         'cod_verificador_autenticidade',
+        /*
+         * Chave de acesso da NFS-e NACIONAL. Só existe no retorno COMPLETO, que
+         * o município liga em "Manutenção > Personalização do Prestador > aba
+         * WebService > Utiliza Retorno Completo na Importação de XML". Entra na
+         * lista para sair sempre presente (null quando o retorno é reduzido),
+         * em vez de aparecer e desaparecer conforme a configuração da
+         * prefeitura.
+         */
+        'chave_acesso_nfse_nacional',
     ];
 
     /**
@@ -81,7 +90,7 @@ class Response
     public ?stdClass $rps = null;
 
     /**
-     * Grupo <nfe>/<nf>: os oito campos de {@see NFE_FIELDS} (situacao_codigo_nfse
+     * Grupo <nfe>/<nf>: os campos de {@see NFE_FIELDS} (situacao_codigo_nfse
      * como int|null, os demais string|null) mais os filhos escalares extras do
      * retorno completo (valor_total, valor_desconto, …, observacao) como string.
      */

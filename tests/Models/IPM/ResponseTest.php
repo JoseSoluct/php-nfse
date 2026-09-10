@@ -407,4 +407,60 @@ final class ResponseTest extends TestCase
         $this->assertNull($response->situacaoCodigo());
         $this->assertFalse($response->isEmitida());
     }
+
+    /**
+     * O retorno COMPLETO — que o municipio liga em "Manutencao > Personalizacao
+     * do Prestador > aba WebService > Utiliza Retorno Completo na Importacao de
+     * XML" — traz a chave de acesso da NFS-e NACIONAL, alem do codigo
+     * verificador. Sao os dois identificadores da nota fora do municipio.
+     */
+    public function testRetornoCompletoTrazAChaveNacionalEOVerificador(): void
+    {
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<retorno>'
+            . '  <mensagem><codigo>[00001] - Sucesso</codigo></mensagem>'
+            . '  <nfse>'
+            . '    <identificador>PRZ01M25</identificador>'
+            . '    <nf>'
+            . '      <numero_nfse>1402</numero_nfse>'
+            . '      <serie_nfse>1</serie_nfse>'
+            . '      <situacao_codigo_nfse>1</situacao_codigo_nfse>'
+            . '      <cod_verificador_autenticidade>A1B2C3D4</cod_verificador_autenticidade>'
+            . '      <chave_acesso_nfse_nacional>43260900000000000000000000000000000000000001</chave_acesso_nfse_nacional>'
+            . '      <link_nfse>https://nfse-lagoavermelha.atende.net/detalhar/1/abc</link_nfse>'
+            . '    </nf>'
+            . '  </nfse>'
+            . '</retorno>';
+
+        $response = Response::read($xml);
+
+        $this->assertTrue($response->isSuccess());
+        $this->assertSame('PRZ01M25', $response->identificador);
+        $this->assertSame('1402', $response->nfe->numero_nfse);
+        $this->assertSame('A1B2C3D4', $response->nfe->cod_verificador_autenticidade);
+        $this->assertSame(
+            '43260900000000000000000000000000000000000001',
+            $response->nfe->chave_acesso_nfse_nacional
+        );
+    }
+
+    /**
+     * No retorno REDUZIDO a chave nacional nao vem — e sai null, e nao ausente,
+     * para o consumidor nao ter de saber qual formato a prefeitura configurou.
+     */
+    public function testRetornoReduzidoDeixaAChaveNacionalNula(): void
+    {
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<retorno>'
+            . '  <mensagem><codigo>00001 - Sucesso</codigo></mensagem>'
+            . '  <numero_nfse>1402</numero_nfse>'
+            . '  <situacao_codigo_nfse>1</situacao_codigo_nfse>'
+            . '</retorno>';
+
+        $response = Response::read($xml);
+
+        $this->assertNull($response->nfe->chave_acesso_nfse_nacional);
+        $this->assertNull($response->nfe->cod_verificador_autenticidade);
+        $this->assertSame('1402', $response->nfe->numero_nfse);
+    }
 }
