@@ -197,9 +197,18 @@ class Tools extends ToolsBase
     }
 
     /**
-     * Normaliza o nome do município para o subdomínio do Atende.Net:
-     * minúsculas, sem acentos, sem pontuação e sem espaços.
+     * Normaliza o identificador do município para o subdomínio do Atende.Net:
+     * minúsculas, sem acentos, sem espaços e sem pontuação — EXCETO o hífen.
      * Ex.: "São José dos Pinhais" → "saojosedospinhais".
+     *
+     * O hífen é preservado porque o subdomínio real NEM SEMPRE é o nome do
+     * município: Lagoa Vermelha/RS atende em `nfse-lagoavermelha.atende.net`.
+     * Removê-lo (como se fazia aqui) produzia `nfselagoavermelha`, host que não
+     * resolve, e o erro chegava como "Could not resolve host" — cURL 6, sem
+     * nenhuma pista de que o problema era o saneamento do slug.
+     *
+     * Hífen no início ou no fim é descartado: rótulo DNS não pode começar nem
+     * terminar com hífen, e deixá-lo passar geraria outro host inválido.
      */
     public static function normalizeCitySlug(string $city): string
     {
@@ -218,8 +227,12 @@ class Tools extends ToolsBase
         ];
 
         $slug = strtolower(strtr(trim($city), $map));
+        $slug = (string) preg_replace('/[^a-z0-9-]/', '', $slug);
 
-        return (string) preg_replace('/[^a-z0-9]/', '', $slug);
+        // Colapsa hífens repetidos e remove os das pontas (regra de rótulo DNS).
+        $slug = (string) preg_replace('/-+/', '-', $slug);
+
+        return trim($slug, '-');
     }
 
     // =========================================================================

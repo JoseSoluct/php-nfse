@@ -56,6 +56,36 @@ final class ToolsUrlTest extends TestCase
         $this->assertSame('boaesperancadoiguacu', Tools::normalizeCitySlug("Boa Esperança do Iguaçu"));
     }
 
+    /**
+     * O subdomínio NEM SEMPRE é o nome do município: Lagoa Vermelha/RS atende
+     * em `nfse-lagoavermelha.atende.net`. Remover o hífen produzia
+     * `nfselagoavermelha`, host que não resolve, e o erro chegava como cURL 6
+     * "Could not resolve host" — sem nenhuma pista de que a causa era o
+     * saneamento do slug.
+     */
+    public function testSlugPreservaHifenDoSubdominio(): void
+    {
+        $tools = new Tools($this->makeConfig(['city_slug' => 'nfse-lagoavermelha']));
+
+        $this->assertSame(
+            'https://nfse-lagoavermelha.atende.net/?pg=rest&service=WNERestServiceNFSe',
+            $tools->getUrl()
+        );
+        $this->assertSame('nfse-lagoavermelha', Tools::normalizeCitySlug('NFSE-Lagoa Vermelha'));
+    }
+
+    /**
+     * Rótulo DNS não pode começar nem terminar com hífen, nem ter hífen
+     * repetido: deixar passar geraria outro host inválido, com o mesmo erro
+     * opaco de resolução.
+     */
+    public function testSlugLimpaHifenDasPontasERepetido(): void
+    {
+        $this->assertSame('brusque', Tools::normalizeCitySlug('-brusque-'));
+        $this->assertSame('a-b', Tools::normalizeCitySlug('a--b'));
+        $this->assertSame('', Tools::normalizeCitySlug('---'));
+    }
+
     public function testTemplateSobrescrevivel(): void
     {
         $tools = new Tools($this->makeConfig([
