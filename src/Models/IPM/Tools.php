@@ -415,7 +415,7 @@ class Tools extends ToolsBase
         $result = $this->executeCurl($options);
 
         $httpCode = (int) $result['httpCode'];
-        $body = (string) $result['body'];
+        $body = $this->normalizeResponseEncoding((string) $result['body']);
         $rawHeaders = (string) $result['headers'];
 
         $this->xmlRequest = $xml;
@@ -613,6 +613,64 @@ class Tools extends ToolsBase
         }
 
         return (bool) preg_match('/<(retorno|nfse)[\s>\/]/i', substr($trimmed, 0, 512));
+    }
+
+    /**
+     * Converte a resposta para UTF-8, reescrevendo a declaração do prólogo.
+     *
+     * O webservice responde em ISO-8859-1 mesmo quando o envio é UTF-8 —
+     * `<?xml version="1.0" encoding="ISO-8859-1"?>` — e a mensagem de erro tem
+     * acento ("serviço", "obrigatório"). Devolver esses bytes crus contamina
+     * TUDO que a aplicação faça com eles depois: gravar em coluna UTF-8 do
+     * Postgres dá `SQLSTATE[22021] invalid byte sequence for encoding "UTF8"`,
+     * e `json_encode()` dá "Malformed UTF-8 characters". Como o texto da falha
+     * costuma virar mensagem de erro, o erro de encoding SUBSTITUI o motivo
+     * real da recusa e o usuário recebe um 500 sem explicação — a recusa do
+     * município, que veio perfeitamente descrita, se perde no caminho.
+     *
+     * Converter aqui, no transporte, é o único ponto que cobre todos os
+     * consumidores: parser, persistência, auditoria e resposta HTTP.
+     */
+    protected function normalizeResponseEncoding(string $body): string
+    {
+        if ($body === '') {
+            return '';
+        }
+
+        $declared = null;
+        if (preg_match('/^<\?xml[^>]*\bencoding\s*=\s*["\']([^"\']+)["\']/i', ltrim($body), $m) === 1) {
+            $declared = strtoupper(trim($m[1]));
+        }
+
+        $isUtf8 = (bool) preg_match('//u', $body);
+
+        if (($declared === null || $declared === 'UTF-8' || $declared === 'UTF8') && $isUtf8) {
+            return $body;
+        }
+
+        /*
+         * Sem declaração e com bytes inválidos, ou declarando algo que não é
+         * UTF-8: ISO-8859-1 é o que este webservice usa. `mb_convert_encoding`
+         * a partir de Latin-1 nunca falha (todo byte é um caractere válido),
+         * então não há caminho de erro a tratar.
+         */
+        $from = ($declared === null || $declared === 'UTF-8' || $declared === 'UTF8')
+            ? 'ISO-8859-1'
+            : $declared;
+
+        $converted = @mb_convert_encoding($body, 'UTF-8', $from);
+
+        if (!is_string($converted) || $converted === '' || !preg_match('//u', $converted)) {
+            $converted = mb_convert_encoding($body, 'UTF-8', 'ISO-8859-1');
+        }
+
+        // O prólogo tem de acompanhar os bytes, ou o parser desfaz a conversão.
+        return (string) preg_replace(
+            '/(<\?xml[^>]*\bencoding\s*=\s*["\'])[^"\']+(["\'])/i',
+            '${1}UTF-8${2}',
+            $converted,
+            1
+        );
     }
 
     protected function excerpt(string $body, int $length = 500): string

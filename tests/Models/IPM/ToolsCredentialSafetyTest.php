@@ -133,7 +133,13 @@ final class ToolsCredentialSafetyTest extends TestCase
 
         $body = $tools->sendXml('<nfse/>');
 
-        $this->assertSame($xml132, $body, 'um <retorno> com mensagem de erro é resposta válida mesmo em 4xx');
+        /*
+         * O corpo chega convertido para UTF-8 (a fixture é ISO-8859-1, como o
+         * webservice responde), então o que se compara é o conteúdo.
+         */
+        $this->assertStringContainsString('[00132]', $body);
+        $this->assertStringContainsString('Usuário ou Senha inválidos!', $body);
+        $this->assertTrue((bool) preg_match('//u', $body), 'um <retorno> com erro também tem de sair em UTF-8');
         $this->assertSame(401, $tools->getLastRequest()['httpCode']);
     }
 

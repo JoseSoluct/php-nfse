@@ -2,6 +2,7 @@
 
 namespace NFePHP\NFSe\Tests\Models\IPM;
 
+use NFePHP\NFSe\Models\IPM\Response;
 use NFePHP\NFSe\Models\IPM\Tools;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -230,6 +231,68 @@ final class ToolsUrlTest extends TestCase
         $tools = new FakeCurlTools($this->makeConfig());
         $tools->queueResponse(self::RETORNO_OK, 500);
 
-        $this->assertSame(self::RETORNO_OK, $tools->sendXml('<nfse/>'));
+        // O prologo sai reescrito para UTF-8; o conteudo e o mesmo.
+        $body = $tools->sendXml('<nfse/>');
+
+        $this->assertStringContainsString('[00001] - Sucesso', $body);
+        $this->assertStringContainsString('encoding="UTF-8"', $body);
+    }
+
+    /**
+     * A recusa real do município veio assim, em ISO-8859-1 e com acento. Os
+     * bytes crus contaminavam tudo a jusante: coluna UTF-8 do Postgres
+     * (SQLSTATE 22021) e `json_encode()` — e o erro de encoding substituía o
+     * motivo da recusa, entregando um 500 sem explicação.
+     */
+    public function testRespostaEmIso88591ChegaEmUtf8ComPrologoCoerente(): void
+    {
+        $retorno = '<?xml version="1.0" encoding="ISO-8859-1"?>'
+            . '<retorno><mensagem><codigo> 00427 - Para a lista de servi'
+            . chr(0xE7) . 'o informada o preenchimento do IBS/CBS '
+            . chr(0xE9) . ' obrigat' . chr(0xF3) . 'rio.</codigo></mensagem></retorno>';
+
+        $tools = new FakeCurlTools($this->makeConfig());
+        $tools->queueResponse($retorno);
+
+        $body = $tools->sendXml('<nfse/>');
+
+        $this->assertTrue((bool) preg_match('//u', $body), 'o corpo devolvido tem de ser UTF-8 válido');
+        $this->assertStringContainsString('serviço', $body);
+        $this->assertStringContainsString('é obrigatório', $body);
+        $this->assertStringContainsString('encoding="UTF-8"', $body);
+        $this->assertStringNotContainsString('ISO-8859-1', $body);
+
+        // Convertido, o retorno ainda tem de ser interpretável — e o acento
+        // chega intacto na mensagem que o usuário vai ler.
+        $response = Response::read($body);
+        $this->assertFalse($response->isSuccess());
+        $this->assertTrue($response->hasCode(427));
+        $this->assertStringContainsString('IBS/CBS é obrigatório', $response->errorsText());
+    }
+
+    public function testRespostaJaEmUtf8NaoEMexida(): void
+    {
+        $retorno = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<retorno><mensagem><codigo> 00427 - Preenchimento é obrigatório.</codigo></mensagem></retorno>';
+
+        $tools = new FakeCurlTools($this->makeConfig());
+        $tools->queueResponse($retorno);
+
+        $this->assertSame($retorno, $tools->sendXml('<nfse/>'));
+    }
+
+    /**
+     * Latin-1 sem prólogo: não há declaração para corrigir, mas os bytes ainda
+     * precisam virar UTF-8 antes de chegar ao banco.
+     */
+    public function testLatin1SemPrologoTambemEConvertido(): void
+    {
+        $tools = new FakeCurlTools($this->makeConfig());
+        $tools->queueResponse('<retorno><mensagem><codigo> 00427 - servi' . chr(0xE7) . 'o</codigo></mensagem></retorno>');
+
+        $body = $tools->sendXml('<nfse/>');
+
+        $this->assertTrue((bool) preg_match('//u', $body));
+        $this->assertStringContainsString('serviço', $body);
     }
 }
