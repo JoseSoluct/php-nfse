@@ -394,15 +394,27 @@ class ItensRps
     public function codigoNbs($value, $campo = null)
     {
         $rotulo = $campo ?: 'codigo NBS';
-        $value = trim((string) $value);
 
-        if (!Validator::stringType()->length(1, 12)->validate($value)) {
+        /*
+         * O XSD do webservice declara a tag como `xs:integer`, e recusa o
+         * codigo pontuado:
+         *
+         *   XSD Error 1824: Element 'codigo_nbs': '1.2001.31.10' is not a
+         *   valid value of the atomic type 'xs:integer'.
+         *
+         * A coluna "tipo" da NTE 122/2025 diz `Caractere`, o que contradiz o
+         * XSD — mas a coluna "tamanho" diz 9, que e exatamente o numero de
+         * digitos do formato 9.9999.99.99 sem os pontos. O XSD vence.
+         */
+        $digits = preg_replace('/[^0-9]/', '', (string) $value);
+
+        if (!Validator::stringType()->length(1, 9)->validate($digits)) {
             throw new \InvalidArgumentException(
-                "O item '$rotulo' deve ter ate 12 caracteres, no formato 9.9999.99.99. Informado: '$value'"
+                "O item '$rotulo' deve ter ate 9 digitos (o codigo 9.9999.99.99 sem os pontos). Informado: '$value'"
             );
         }
 
-        $this->infCodigoNbs = $value;
+        $this->infCodigoNbs = $digits;
     }
 
     /**

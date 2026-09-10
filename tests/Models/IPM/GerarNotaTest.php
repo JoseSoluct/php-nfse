@@ -453,7 +453,7 @@ final class GerarNotaTest extends TestCase
     {
         $rps = $this->makeRps();
         $rps->localidadeIncidencia('4311304');
-        $rps->ibsCbs(1, 0, '100301', '011', '011004');
+        $rps->ibsCbs(0, 0, '100301', '011', '011004');
 
         $item = $this->makeItem();
         $item->codigoNbs('1.1501.10.00');
@@ -466,14 +466,19 @@ final class GerarNotaTest extends TestCase
         $this->assertSame('4311304', $this->value($dom, '/nfse/nf/IBSCBS/cLocalidadeIncid'));
 
         // 2) O IBSCBS da raiz carrega a classificacao.
-        $this->assertSame('1', $this->value($dom, '/nfse/IBSCBS/finNFSe'));
+        $this->assertSame('0', $this->value($dom, '/nfse/IBSCBS/finNFSe'));
         $this->assertSame('0', $this->value($dom, '/nfse/IBSCBS/indFinal'));
         $this->assertSame('100301', $this->value($dom, '/nfse/IBSCBS/cIndOp'));
         $this->assertSame('011', $this->value($dom, '/nfse/IBSCBS/valores/trib/gIBSCBS/CST'));
         $this->assertSame('011004', $this->value($dom, '/nfse/IBSCBS/valores/trib/gIBSCBS/cClassTrib'));
 
-        // 3) O item leva o NBS.
-        $this->assertSame('1.1501.10.00', $this->value($dom, '//lista/codigo_nbs'));
+        /*
+         * 3) O item leva o NBS — SEM os pontos. O XSD declara a tag como
+         * `xs:integer` ("XSD Error 1824: Element 'codigo_nbs': '1.2001.31.10'
+         * is not a valid value of the atomic type 'xs:integer'"), o que
+         * contradiz a coluna "tipo" da NTE mas casa com a coluna "tamanho": 9.
+         */
+        $this->assertSame('115011000', $this->value($dom, '//lista/codigo_nbs'));
 
         /*
          * O municipio CALCULA os valores ("serao calculados automaticamente e
@@ -497,7 +502,7 @@ final class GerarNotaTest extends TestCase
     {
         $rps = $this->makeRps();
         $rps->localidadeIncidencia('4311304');
-        $rps->ibsCbs(1, 1, '100301', '011', '011004');
+        $rps->ibsCbs(0, 1, '100301', '011', '011004');
         $rps->pisCofinsProprio('01', 1000.00, 0.65, 4.00);
 
         $item = $this->makeItem();
@@ -558,7 +563,7 @@ final class GerarNotaTest extends TestCase
     {
         $rps = $this->makeRps();
         $rps->localidadeIncidencia('4311304');
-        $rps->ibsCbs(1, 0, '100301', '011', '011004', 2);
+        $rps->ibsCbs(0, 0, '100301', '011', '011004', 2);
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('[362]');
@@ -572,7 +577,7 @@ final class GerarNotaTest extends TestCase
     {
         $rps = $this->makeRps();
         $rps->localidadeIncidencia('4311304');
-        $rps->ibsCbs(1, 0, '100301', '011', '011004', 1);
+        $rps->ibsCbs(0, 0, '100301', '011', '011004', 1);
         $rps->referenciasNFSe(['43260900000000000000000000000000000000000001']);
 
         $this->expectException(InvalidArgumentException::class);
@@ -584,7 +589,7 @@ final class GerarNotaTest extends TestCase
     {
         $rps = $this->makeRps();
         $rps->localidadeIncidencia('4311304');
-        $rps->ibsCbs(1, 0, '100301', '011', '011004', 3);
+        $rps->ibsCbs(0, 0, '100301', '011', '011004', 3);
         // [363]: chave repetida e sempre erro, nunca intencao.
         $rps->referenciasNFSe(['CHAVE-A', 'CHAVE-B', 'CHAVE-A']);
 
@@ -598,7 +603,7 @@ final class GerarNotaTest extends TestCase
     {
         $rps = $this->makeRps();
         $rps->localidadeIncidencia('4311304');
-        $rps->ibsCbs(1, 0, '100301', '011', '011004');
+        $rps->ibsCbs(0, 0, '100301', '011', '011004');
         $rps->imovel(['cCIB' => '12345679']);
 
         $dom = $this->load($this->render($rps));
@@ -611,7 +616,7 @@ final class GerarNotaTest extends TestCase
     {
         $rps = $this->makeRps();
         $rps->localidadeIncidencia('4311304');
-        $rps->ibsCbs(1, 0, '100301', '011', '011004');
+        $rps->ibsCbs(0, 0, '100301', '011', '011004');
         $rps->imovel([
             'inscImobFisc' => '5151515151',
             'CEP' => '89160000',
@@ -648,7 +653,38 @@ final class GerarNotaTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('finNFSe');
+        $rps->ibsCbs(4, 0, '100301', '011', '011004');
+    }
+
+    /**
+     * O dominio da nota nacional (1 regular, 2 complementar, 3 decisao
+     * judicial) NAO vale no Atende.Net: o XSD restringe a tag ao conjunto
+     * {'0'} — "XSD Error 1840: Element 'finNFSe': [facet 'enumeration'] The
+     * value '1' is not an element of the set {'0'}". O exemplo da NTE, que
+     * mostra 0, estava literal.
+     */
+    public function testFinalidadeZeroEAceita(): void
+    {
+        $rps = $this->makeRps();
+        $rps->localidadeIncidencia('4311304');
         $rps->ibsCbs(0, 0, '100301', '011', '011004');
+
+        $dom = $this->load($this->render($rps));
+
+        $this->assertSame('0', $this->value($dom, '/nfse/IBSCBS/finNFSe'));
+    }
+
+    /**
+     * [1824]: o codigo pontuado derruba a validacao do XSD. Sanear na
+     * biblioteca poupa uma ida ao webservice — e o cadastro guarda com ponto.
+     */
+    public function testCodigoNbsPerdeOsPontosEMantemNoveDigitos(): void
+    {
+        $item = new ItensRps();
+        $item->codigoNbs('1.2001.31.10');
+
+        $this->assertSame('120013110', $item->infCodigoNbs);
+        $this->assertSame(9, strlen($item->infCodigoNbs));
     }
 
     /**
@@ -668,7 +704,7 @@ final class GerarNotaTest extends TestCase
         $rps = $this->makeRps();
         $rps->localidadeIncidencia('4311304');
         // Cadastro que guarda os codigos como inteiro perde o zero a esquerda.
-        $rps->ibsCbs(1, 0, 100301, 11, 11004);
+        $rps->ibsCbs(0, 0, 100301, 11, 11004);
 
         $dom = $this->load($this->render($rps));
 

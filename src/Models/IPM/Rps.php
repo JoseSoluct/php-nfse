@@ -933,9 +933,24 @@ class Rps extends RpsBase
     {
         $rotulo = $campo ?: 'grupo IBSCBS';
 
-        if (!in_array((string) $finNFSe, array('1', '2', '3'), true)) {
+        /*
+         * O XSD do webservice restringe a tag a UM valor:
+         *
+         *   XSD Error 1840: Element 'finNFSe': [facet 'enumeration'] The value
+         *   '1' is not an element of the set {'0'}.
+         *
+         * O dominio da nota nacional (1 regular, 2 complementar, 3 decisao
+         * judicial) NAO vale aqui, e o exemplo da NTE 122/2025 — que mostra
+         * `<finNFSe>0</finNFSe>` ao lado de preenchimentos genericos como
+         * `<valor_total>00,00</valor_total>` — estava literal.
+         *
+         * A validacao aceita 0 a 3 para nao virar o gargalo se a enumeracao do
+         * municipio crescer; quem escolhe o valor e a aplicacao, e hoje o unico
+         * aceito e "0".
+         */
+        if (!in_array((string) $finNFSe, array('0', '1', '2', '3'), true)) {
             throw new \InvalidArgumentException(
-                "O item 'finNFSe' do '$rotulo' deve ser 1 (regular), 2 (complementar) ou 3 (decisao judicial ou administrativa). Informado: '$finNFSe'"
+                "O item 'finNFSe' do '$rotulo' deve ser 0 a 3 (o XSD do Atende.Net aceita hoje apenas 0). Informado: '$finNFSe'"
             );
         }
 
