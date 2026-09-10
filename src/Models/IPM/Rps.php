@@ -200,6 +200,60 @@ class Rps extends RpsBase
      */
     public $infObservacao;
 
+    // =========================================================================
+    // Reforma Tributária — IBS/CBS (NTE 122/2025 v1.7)
+    // =========================================================================
+
+    /**
+     * PIS/COFINS PRÓPRIOS, do grupo <pis_cofins>.
+     *
+     * Não confundir com $infValorPis/$infValorCofins, que são RETENÇÃO: a §3
+     * da NTE 122/2025 separa os dois efeitos. O próprio é deduzido da base de
+     * cálculo do IBS/CBS e NÃO reduz o líquido da nota; o retido reduz o
+     * líquido e não mexe na base. A tag <tipo_retencao> foi descontinuada — o
+     * que distingue um do outro agora é em qual grupo o valor foi informado.
+     *
+     * @var string|null
+     */
+    public $infPisCofinsCst;
+    /** @var string|null */
+    public $infPisCofinsBaseCalculo;
+    /** @var string|null */
+    public $infAliquotaPis;
+    /** @var string|null */
+    public $infAliquotaCofins;
+
+    /**
+     * Código IBGE (7) do município de incidência do IBS/CBS, de <nf><IBSCBS>.
+     *
+     * É IBGE, e não TOM: o mesmo XML carrega os dois padrões, com <prestador>
+     * e <tomador> em TOM. Trocá-los rende o erro [419].
+     *
+     * @var string|null
+     */
+    public $infLocalidadeIncidencia;
+
+    /**
+     * Grupo <IBSCBS> da raiz. Indicador da finalidade da emissão: 1 regular,
+     * 2 complementar, 3 decisão judicial ou administrativa.
+     * @var string|null
+     */
+    public $infFinNFSe;
+    /** Operação de uso ou consumo pessoal: 1 sim, 0 não. @var string|null */
+    public $infIndFinal;
+    /** Código indicador da operação de fornecimento (6 dígitos). @var string|null */
+    public $infCIndOp;
+    /** Tipo de operação com entes governamentais, 1 a 5. @var string|null */
+    public $infTpOper;
+    /** @var array<int, string> Chaves de acesso de NFS-e referenciadas. */
+    public $infRefNFSe = [];
+    /** @var array<string, string> Dados do imóvel: inscImobFisc, cCIB, CEP, xLgr, nro, xCpl, xBairro. */
+    public $infImovel = [];
+    /** CST do IBS/CBS (3 dígitos). @var string|null */
+    public $infIbsCbsCst;
+    /** Classificação tributária do IBS/CBS (6 dígitos). @var string|null */
+    public $infIbsCbsClassTrib;
+
     /**
      * Set informations of customer
      * @param string $tipo - TOMADORPJ, TOMADORPF ou TOMADORES
@@ -783,6 +837,210 @@ class Rps extends RpsBase
             throw new \InvalidArgumentException($msg);
         }
         return $value;
+    }
+
+
+    // =========================================================================
+    // Reforma Tributária — IBS/CBS (NTE 122/2025 v1.7)
+    // =========================================================================
+
+    /**
+     * PIS/COFINS próprios. Grupo inteiro ou nada: informar só parte dele deixa
+     * o webservice sem base para o cálculo, e o erro [396] cobra que a base
+     * seja maior que zero e menor que o valor do serviço.
+     *
+     * @param string|int $cst CST do PIS/COFINS (2)
+     * @param float $baseCalculo
+     * @param float $aliquotaPis percentual
+     * @param float $aliquotaCofins percentual
+     * @param string|null $campo
+     */
+    public function pisCofinsProprio($cst, $baseCalculo, $aliquotaPis, $aliquotaCofins, $campo = null)
+    {
+        $rotulo = $campo ?: 'grupo pis_cofins';
+
+        $cst = preg_replace('/[^0-9]/', '', (string) $cst);
+        if (!Validator::stringType()->length(1, 2)->validate($cst)) {
+            throw new \InvalidArgumentException("O CST do '$rotulo' deve ter ate 2 digitos. Informado: '$cst'");
+        }
+
+        $valores = array(
+            'base_calculo' => $baseCalculo,
+            'aliquota_pis' => $aliquotaPis,
+            'aliquota_cofins' => $aliquotaCofins,
+        );
+
+        foreach ($valores as $nome => $valor) {
+            if (!Validator::numericVal()->floatVal()->min(0)->validate($valor)) {
+                throw new \InvalidArgumentException(
+                    "O item '$nome' do '$rotulo' deve ser numerico tipo float. Informado: '$valor'"
+                );
+            }
+        }
+
+        // [401]: as aliquotas de PIS e COFINS devem estar entre 0% e 10%.
+        foreach (array('aliquota_pis' => $aliquotaPis, 'aliquota_cofins' => $aliquotaCofins) as $nome => $valor) {
+            if ((float) $valor > 10) {
+                throw new \InvalidArgumentException(
+                    "O item '$nome' do '$rotulo' deve ser menor ou igual a 10 por cento (erro [401] do webservice). Informado: '$valor'"
+                );
+            }
+        }
+
+        $this->infPisCofinsCst = str_pad($cst, 2, '0', STR_PAD_LEFT);
+        $this->infPisCofinsBaseCalculo = $this->getValorFormatado($baseCalculo);
+        $this->infAliquotaPis = $this->getValorFormatado($aliquotaPis);
+        $this->infAliquotaCofins = $this->getValorFormatado($aliquotaCofins);
+    }
+
+    /**
+     * Codigo IBGE do municipio de incidencia do IBS/CBS. Sete digitos — o erro
+     * [419] recusa codigo de IBGE invalido, e o [417] cobra a tag.
+     *
+     * @param string $value
+     * @param string|null $campo
+     */
+    public function localidadeIncidencia($value, $campo = null)
+    {
+        $rotulo = $campo ?: 'codigo do local de incidencia do IBS/CBS';
+        $digits = preg_replace('/[^0-9]/', '', (string) $value);
+
+        if (!Validator::stringType()->length(7, 7)->validate($digits)) {
+            throw new \InvalidArgumentException(
+                "O item '$rotulo' deve ser o codigo IBGE do municipio, com 7 digitos. Informado: '$value'"
+            );
+        }
+
+        $this->infLocalidadeIncidencia = $digits;
+    }
+
+    /**
+     * Grupo <IBSCBS> da raiz: finalidade, consumo pessoal, indicador de
+     * operacao e a classificacao tributaria.
+     *
+     * `tpOper` fica nulo quando nao se aplica — os erros [361] e [364] recusam
+     * a tag informada fora de compra governamental ou de servico sobre imovel.
+     *
+     * @param int|string $finNFSe 1 regular, 2 complementar, 3 decisao judicial/administrativa
+     * @param int|string $indFinal 1 uso ou consumo pessoal, 0 nao
+     * @param string $cIndOp indicador da operacao de fornecimento (6 digitos)
+     * @param string $cst CST do IBS/CBS (3 digitos)
+     * @param string $classTrib classificacao tributaria (6 digitos)
+     * @param int|string|null $tpOper 1 a 5, ou null
+     * @param string|null $campo
+     */
+    public function ibsCbs($finNFSe, $indFinal, $cIndOp, $cst, $classTrib, $tpOper = null, $campo = null)
+    {
+        $rotulo = $campo ?: 'grupo IBSCBS';
+
+        if (!in_array((string) $finNFSe, array('1', '2', '3'), true)) {
+            throw new \InvalidArgumentException(
+                "O item 'finNFSe' do '$rotulo' deve ser 1 (regular), 2 (complementar) ou 3 (decisao judicial ou administrativa). Informado: '$finNFSe'"
+            );
+        }
+
+        if (!in_array((string) $indFinal, array('0', '1'), true)) {
+            throw new \InvalidArgumentException(
+                "O item 'indFinal' do '$rotulo' deve ser 0 ou 1. Informado: '$indFinal'"
+            );
+        }
+
+        $cIndOp = preg_replace('/[^0-9]/', '', (string) $cIndOp);
+        if (!Validator::stringType()->length(1, 6)->validate($cIndOp)) {
+            throw new \InvalidArgumentException(
+                "O item 'cIndOp' do '$rotulo' deve ter ate 6 digitos. Informado: '$cIndOp'"
+            );
+        }
+
+        $cst = preg_replace('/[^0-9]/', '', (string) $cst);
+        if (!Validator::stringType()->length(1, 3)->validate($cst)) {
+            throw new \InvalidArgumentException(
+                "O item 'CST' do '$rotulo' deve ter ate 3 digitos. Informado: '$cst'"
+            );
+        }
+
+        $classTrib = preg_replace('/[^0-9]/', '', (string) $classTrib);
+        if (!Validator::stringType()->length(1, 6)->validate($classTrib)) {
+            throw new \InvalidArgumentException(
+                "O item 'cClassTrib' do '$rotulo' deve ter ate 6 digitos. Informado: '$classTrib'"
+            );
+        }
+
+        if ($tpOper !== null && !in_array((string) $tpOper, array('1', '2', '3', '4', '5'), true)) {
+            throw new \InvalidArgumentException(
+                "O item 'tpOper' do '$rotulo' deve ser de 1 a 5 quando informado. Informado: '$tpOper'"
+            );
+        }
+
+        $this->infFinNFSe = (string) $finNFSe;
+        $this->infIndFinal = (string) $indFinal;
+        $this->infCIndOp = str_pad($cIndOp, 6, '0', STR_PAD_LEFT);
+        $this->infIbsCbsCst = str_pad($cst, 3, '0', STR_PAD_LEFT);
+        $this->infIbsCbsClassTrib = str_pad($classTrib, 6, '0', STR_PAD_LEFT);
+        $this->infTpOper = $tpOper === null ? null : (string) $tpOper;
+    }
+
+    /**
+     * Chaves de acesso de NFS-e referenciadas, do grupo <gRefNFSe>.
+     *
+     * Obrigatorio com `tpOper` 2 ou 3 [362], proibido com 1, 4, 5 ou sem
+     * `tpOper` [361], e sem repeticao [363] — a deduplicacao e feita aqui
+     * porque a repeticao e sempre erro, nunca intencao.
+     *
+     * @param array $chaves
+     * @param string|null $campo
+     */
+    public function referenciasNFSe(array $chaves, $campo = null)
+    {
+        $rotulo = $campo ?: 'grupo gRefNFSe';
+        $limpas = array();
+
+        foreach ($chaves as $chave) {
+            $chave = trim((string) $chave);
+            if ($chave === '') {
+                continue;
+            }
+            if (!Validator::stringType()->length(1, 50)->validate($chave)) {
+                throw new \InvalidArgumentException(
+                    "As chaves do '$rotulo' devem ter ate 50 caracteres. Informada: '$chave'"
+                );
+            }
+            $limpas[$chave] = $chave;
+        }
+
+        $this->infRefNFSe = array_values($limpas);
+    }
+
+    /**
+     * Dados do imovel, do grupo <imovel>.
+     *
+     * A NTE aceita o grupo com apenas o CIB. As chaves aceitas sao
+     * inscImobFisc, cCIB, CEP, xLgr, nro, xCpl e xBairro; o [388] cobra o
+     * endereco para certos indicadores de operacao e o [397] o proibe para
+     * outros, entao quem decide e a aplicacao.
+     *
+     * @param array $dados
+     * @param string|null $campo
+     */
+    public function imovel(array $dados, $campo = null)
+    {
+        $rotulo = $campo ?: 'grupo imovel';
+        $aceitas = array('inscImobFisc', 'cCIB', 'CEP', 'xLgr', 'nro', 'xCpl', 'xBairro');
+        $limpos = array();
+
+        foreach ($dados as $chave => $valor) {
+            if (!in_array($chave, $aceitas, true)) {
+                throw new \InvalidArgumentException(
+                    "O item '$chave' nao pertence ao '$rotulo'. Aceitos: " . implode(', ', $aceitas) . '.'
+                );
+            }
+            $valor = trim((string) $valor);
+            if ($valor !== '') {
+                $limpos[$chave] = $this->sanitizeTextoLivre($valor);
+            }
+        }
+
+        $this->infImovel = $limpos;
     }
 
     private function getValorFormatado($value)

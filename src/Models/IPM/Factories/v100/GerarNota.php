@@ -206,6 +206,58 @@ class GerarNota extends Factory
             true
         );
 
+        /*
+         * §3 da NTE 122/2025: <pis_cofins> é o PIS/COFINS PRÓPRIO, deduzido da
+         * base de cálculo do IBS/CBS e que NÃO reduz o líquido da nota. As tags
+         * <valor_pis>/<valor_cofins> logo abaixo continuam sendo a RETENÇÃO,
+         * que reduz o líquido e não mexe na base. A tag <tipo_retencao> foi
+         * descontinuada: o grupo em que o valor aparece é o que distingue.
+         *
+         * O grupo só sai completo — o erro [396] cobra a base maior que zero, e
+         * meia informação deixaria o webservice sem como calcular.
+         */
+        if ($rps->infPisCofinsCst !== null) {
+            $pisCofins = $dom->createElement('pis_cofins');
+
+            $dom->addChild(
+                $pisCofins,
+                'cst',
+                $rps->infPisCofinsCst,
+                true,
+                "Código da situação tributária do PIS e COFINS",
+                true
+            );
+
+            $dom->addChild(
+                $pisCofins,
+                'base_calculo',
+                $rps->infPisCofinsBaseCalculo ?? '',
+                true,
+                "Valor da base de cálculo de PIS e COFINS",
+                true
+            );
+
+            $dom->addChild(
+                $pisCofins,
+                'aliquota_pis',
+                $rps->infAliquotaPis ?? '',
+                true,
+                "Valor da alíquota do PIS",
+                true
+            );
+
+            $dom->addChild(
+                $pisCofins,
+                'aliquota_cofins',
+                $rps->infAliquotaCofins ?? '',
+                true,
+                "Valor da alíquota do COFINS",
+                true
+            );
+
+            $nf->appendChild($pisCofins);
+        }
+
         $dom->addChild(
             $nf,
             'valor_pis',
@@ -232,6 +284,26 @@ class GerarNota extends Factory
             "Observações nota fiscal",
             true
         );
+
+        /*
+         * Último filho de <nf>. Carrega só o município de incidência, em
+         * código IBGE — e o contraste com <prestador><cidade>, que é TOM, é
+         * proposital: o mesmo XML usa os dois padrões. Trocá-los rende [419].
+         */
+        if ($rps->infLocalidadeIncidencia !== null) {
+            $ibsCbsNf = $dom->createElement('IBSCBS');
+
+            $dom->addChild(
+                $ibsCbsNf,
+                'cLocalidadeIncid',
+                $rps->infLocalidadeIncidencia,
+                true,
+                "Código IBGE do município de incidência do IBS/CBS",
+                true
+            );
+
+            $nf->appendChild($ibsCbsNf);
+        }
 
         //Adiciona as tags ao DOM
         $root->appendChild($nf);
@@ -495,6 +567,22 @@ class GerarNota extends Factory
                 true
             );
 
+            /*
+             * Excludente do de cima: [389] recusa a incidência informada para
+             * prestador E tomador, e [390] a recusa para o tomador quando não
+             * há tomador. Por isso a tag só sai quando a aplicação a informa.
+             */
+            if ($item->infTributaMunicipioTomador !== null) {
+                $dom->addChild(
+                    $lista,
+                    'tributa_municipio_tomador',
+                    $item->infTributaMunicipioTomador,
+                    false,
+                    "Informa se o imposto e recolhido no municipio do tomador",
+                    true
+                );
+            }
+
             $dom->addChild(
                 $lista,
                 'codigo_local_prestacao_servico',
@@ -530,6 +618,24 @@ class GerarNota extends Factory
                 "Valor unitario dos serviços prestados relativo à unidade informada",
                 true
             );
+
+            /*
+             * A ordem é a da seção 5.1 da NTE 122/2025: o NBS vem ANTES do
+             * subitem da lista de serviços. Obrigatório quando o município
+             * exige IBS/CBS ([366] cobra a tag, [367] recusa NBS inexistente),
+             * e opcional aqui porque quem sabe se o município exige é a
+             * aplicação.
+             */
+            if ($item->infCodigoNbs !== null) {
+                $dom->addChild(
+                    $lista,
+                    'codigo_nbs',
+                    $item->infCodigoNbs,
+                    false,
+                    "Código da NBS (Nomenclatura Brasileira de Serviços)",
+                    true
+                );
+            }
 
             $dom->addChild(
                 $lista,
@@ -606,12 +712,31 @@ class GerarNota extends Factory
                 true
             );
 
+            /*
+             * Desconto INCONDICIONAL do item, que entra na base do IBS/CBS
+             * (vBC = valor do serviço − desconto incondicionado − PIS/COFINS
+             * próprio). Não confundir com <valor_desconto> de <nf>, que é o
+             * desconto da nota e não participa desse cálculo.
+             */
+            if ($item->infValorDescontoIncondicional !== null) {
+                $dom->addChild(
+                    $lista,
+                    'valor_desconto_incondicional',
+                    $item->infValorDescontoIncondicional,
+                    false,
+                    "Valor do desconto incondicional do item",
+                    true
+                );
+            }
+
             //Adiciona as tags ao DOM
             $itens->appendChild($lista);
         }
 
         //Adiciona as tags ao DOM
         $root->appendChild($itens);
+
+        $this->appendIbsCbs($dom, $root, $rps);
 
         if (!empty($rps->infGenericos)) {
             //Cria o elemento genericos
@@ -750,5 +875,175 @@ class GerarNota extends Factory
 
         $body = $this->clear($body);
         return $this->declararEncoding($body, $config);
+    }
+
+    /**
+     * Grupo <IBSCBS> da raiz (NTE 122/2025 v1.7, §5.1).
+     *
+     * O que vai aqui é CLASSIFICAÇÃO, não conta: "os valores de IBS e CBS serão
+     * calculados automaticamente e serão retornados na emissão da NFS-e". Por
+     * isso nem vBC, nem alíquotas efetivas, nem valores de tributo saem no
+     * envio — informá-los seria disputar o cálculo com o município.
+     *
+     * O grupo inteiro é opcional na biblioteca porque a exigência é por
+     * MUNICÍPIO e por LISTA DE SERVIÇO (o erro 00427 é justamente "para a lista
+     * de serviço informada o preenchimento do IBS/CBS é obrigatório"), e não se
+     * aplica a optantes do Simples Nacional. Quem sabe disso é a aplicação.
+     *
+     * @param Dom $dom
+     * @param \DOMElement $root
+     * @param Rps $rps
+     * @return void
+     */
+    private function appendIbsCbs($dom, $root, Rps $rps)
+    {
+        if ($rps->infFinNFSe === null) {
+            return;
+        }
+
+        $ibsCbs = $dom->createElement('IBSCBS');
+
+        $dom->addChild(
+            $ibsCbs,
+            'finNFSe',
+            $rps->infFinNFSe,
+            true,
+            "Indicador da finalidade da emissao da NFS-e",
+            true
+        );
+
+        $dom->addChild(
+            $ibsCbs,
+            'indFinal',
+            $rps->infIndFinal ?? '',
+            true,
+            "Indica operacao de uso ou consumo pessoal",
+            true
+        );
+
+        $dom->addChild(
+            $ibsCbs,
+            'cIndOp',
+            $rps->infCIndOp ?? '',
+            true,
+            "Codigo indicador da operacao de fornecimento",
+            true
+        );
+
+        if ($rps->infTpOper !== null) {
+            $dom->addChild(
+                $ibsCbs,
+                'tpOper',
+                $rps->infTpOper,
+                false,
+                "Tipo de operacao com entes governamentais",
+                true
+            );
+        }
+
+        /*
+         * [361]/[362]: as referências só valem com tpOper 2 ou 3. A regra é
+         * validada aqui porque enviar o grupo fora disso é recusa garantida, e
+         * a mensagem do webservice não diz qual das duas condições falhou.
+         */
+        if (!empty($rps->infRefNFSe)) {
+            if (!in_array((string) $rps->infTpOper, array('2', '3'), true)) {
+                throw new InvalidArgumentException(
+                    'O grupo de documentos referenciados (gRefNFSe) so pode ser informado com tpOper 2 ou 3 '
+                    . '(erros [361] e [362] do webservice).'
+                );
+            }
+
+            $gRef = $dom->createElement('gRefNFSe');
+
+            foreach ($rps->infRefNFSe as $chave) {
+                $dom->addChild(
+                    $gRef,
+                    'refNFSe',
+                    $chave,
+                    true,
+                    "Chave de acesso da NFS-e referenciada",
+                    true
+                );
+            }
+
+            $ibsCbs->appendChild($gRef);
+        } elseif (in_array((string) $rps->infTpOper, array('2', '3'), true)) {
+            throw new InvalidArgumentException(
+                'Com tpOper 2 ou 3 o grupo de documentos referenciados (gRefNFSe) e obrigatorio '
+                . '(erro [362] do webservice).'
+            );
+        }
+
+        if (!empty($rps->infImovel)) {
+            $imovel = $dom->createElement('imovel');
+
+            foreach (array('inscImobFisc', 'cCIB') as $tag) {
+                if (isset($rps->infImovel[$tag])) {
+                    $dom->addChild(
+                        $imovel,
+                        $tag,
+                        $rps->infImovel[$tag],
+                        false,
+                        "Identificacao do imovel",
+                        true
+                    );
+                }
+            }
+
+            $endereco = array();
+            foreach (array('CEP', 'xLgr', 'nro', 'xCpl', 'xBairro') as $tag) {
+                if (isset($rps->infImovel[$tag])) {
+                    $endereco[$tag] = $rps->infImovel[$tag];
+                }
+            }
+
+            if ($endereco !== array()) {
+                $end = $dom->createElement('end');
+
+                foreach ($endereco as $tag => $valor) {
+                    $dom->addChild(
+                        $end,
+                        $tag,
+                        $valor,
+                        false,
+                        "Endereco do imovel",
+                        true
+                    );
+                }
+
+                $imovel->appendChild($end);
+            }
+
+            $ibsCbs->appendChild($imovel);
+        }
+
+        $valores = $dom->createElement('valores');
+        $trib = $dom->createElement('trib');
+        $gIbsCbs = $dom->createElement('gIBSCBS');
+
+        $dom->addChild(
+            $gIbsCbs,
+            'CST',
+            $rps->infIbsCbsCst ?? '',
+            true,
+            "Codigo da situacao tributaria do IBS e da CBS",
+            true
+        );
+
+        $dom->addChild(
+            $gIbsCbs,
+            'cClassTrib',
+            $rps->infIbsCbsClassTrib ?? '',
+            true,
+            "Codigo de classificacao tributaria do IBS e da CBS",
+            true
+        );
+
+        $trib->appendChild($gIbsCbs);
+        $valores->appendChild($trib);
+        $ibsCbs->appendChild($valores);
+
+        $root->appendChild($ibsCbs);
     }
 }

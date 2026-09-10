@@ -422,4 +422,258 @@ final class GerarNotaTest extends TestCase
         $this->assertFalse($dom->documentElement->hasAttribute('id'));
         $this->assertSame(0, $dom->getElementsByTagNameNS(self::NS_DSIG, 'Signature')->length);
     }
+
+    // =========================================================================
+    // Reforma Tributária — IBS/CBS (NTE 122/2025 v1.7)
+    // =========================================================================
+
+    /**
+     * Nada de IBS/CBS sai por acidente: a exigência é por município e por lista
+     * de serviço, e não se aplica ao Simples Nacional. Um XML que passou a
+     * carregar tags novas sem ninguém pedir quebraria todos os municípios que
+     * ainda estão na NTE 35/2021.
+     */
+    public function testSemDadosDeIbsCbsONadaMudaNoXml(): void
+    {
+        $dom = $this->load($this->render($this->makeRps()));
+
+        $this->assertSame(0, $this->query($dom, '//IBSCBS')->length);
+        $this->assertSame(0, $this->query($dom, '//pis_cofins')->length);
+        $this->assertSame(0, $this->query($dom, '//codigo_nbs')->length);
+        $this->assertSame(0, $this->query($dom, '//tributa_municipio_tomador')->length);
+        $this->assertSame(0, $this->query($dom, '//valor_desconto_incondicional')->length);
+    }
+
+    /**
+     * O cenario que a prefeitura de Lagoa Vermelha recusou com o codigo 00427
+     * ("para a lista de servico informada o preenchimento do IBS/CBS e
+     * obrigatorio"): o grupo completo, com classificacao e sem valores.
+     */
+    public function testGrupoIbsCbsSaiCompletoNaOrdemDaNte(): void
+    {
+        $rps = $this->makeRps();
+        $rps->localidadeIncidencia('4311304');
+        $rps->ibsCbs(1, 0, '100301', '011', '011004');
+
+        $item = $this->makeItem();
+        $item->codigoNbs('1.1501.10.00');
+        $item->valorDescontoIncondicional(0);
+        $rps->infItens = [$item];
+
+        $dom = $this->load($this->render($rps));
+
+        // 1) O IBSCBS de <nf> carrega so o municipio de incidencia, em IBGE.
+        $this->assertSame('4311304', $this->value($dom, '/nfse/nf/IBSCBS/cLocalidadeIncid'));
+
+        // 2) O IBSCBS da raiz carrega a classificacao.
+        $this->assertSame('1', $this->value($dom, '/nfse/IBSCBS/finNFSe'));
+        $this->assertSame('0', $this->value($dom, '/nfse/IBSCBS/indFinal'));
+        $this->assertSame('100301', $this->value($dom, '/nfse/IBSCBS/cIndOp'));
+        $this->assertSame('011', $this->value($dom, '/nfse/IBSCBS/valores/trib/gIBSCBS/CST'));
+        $this->assertSame('011004', $this->value($dom, '/nfse/IBSCBS/valores/trib/gIBSCBS/cClassTrib'));
+
+        // 3) O item leva o NBS.
+        $this->assertSame('1.1501.10.00', $this->value($dom, '//lista/codigo_nbs'));
+
+        /*
+         * O municipio CALCULA os valores ("serao calculados automaticamente e
+         * serao retornados na emissao"). Mandar base ou aliquota efetiva seria
+         * disputar a conta com ele.
+         */
+        foreach (['vBC', 'pAliqEfetUF', 'pAliqEfetMun', 'pAliqEfetCBS', 'vIBSUF', 'vIBSMun', 'vCBS'] as $tag) {
+            $this->assertSame(0, $this->query($dom, '//' . $tag)->length, "A tag {$tag} nao deve ser enviada");
+        }
+
+        // 4) tpOper e gRefNFSe ficam fora quando nao se aplicam ([361]/[364]).
+        $this->assertSame(0, $this->query($dom, '//tpOper')->length);
+        $this->assertSame(0, $this->query($dom, '//gRefNFSe')->length);
+    }
+
+    /**
+     * A ordem das tags e a da secao 5.1: o NBS vem ANTES do subitem, e o
+     * IBSCBS de <nf> e o ultimo filho de <nf>.
+     */
+    public function testOrdemDasTagsNovasSegueOLayout(): void
+    {
+        $rps = $this->makeRps();
+        $rps->localidadeIncidencia('4311304');
+        $rps->ibsCbs(1, 1, '100301', '011', '011004');
+        $rps->pisCofinsProprio('01', 1000.00, 0.65, 4.00);
+
+        $item = $this->makeItem();
+        $item->codigoNbs('1.1501.10.00');
+        $item->valorDescontoIncondicional(15.50);
+        $item->tributaMunicipioTomador('0');
+        $rps->infItens = [$item];
+
+        $dom = $this->load($this->render($rps));
+
+        $nf = $dom->getElementsByTagName('nf')->item(0);
+        $nomes = $this->childNames($nf);
+
+        $this->assertSame('IBSCBS', end($nomes), 'O IBSCBS e o ultimo filho de <nf>');
+        $this->assertLessThan(
+            array_search('valor_pis', $nomes, true),
+            array_search('pis_cofins', $nomes, true),
+            'O grupo pis_cofins vem antes de valor_pis'
+        );
+        $this->assertGreaterThan(
+            array_search('valor_rps', $nomes, true),
+            array_search('pis_cofins', $nomes, true),
+            'O grupo pis_cofins vem depois de valor_rps'
+        );
+
+        $lista = $dom->getElementsByTagName('lista')->item(0);
+        $nomesItem = $this->childNames($lista);
+
+        $this->assertLessThan(
+            array_search('codigo_item_lista_servico', $nomesItem, true),
+            array_search('codigo_nbs', $nomesItem, true),
+            'O codigo_nbs vem antes do subitem da lista de servicos'
+        );
+        $this->assertGreaterThan(
+            array_search('valor_issrf', $nomesItem, true),
+            array_search('valor_desconto_incondicional', $nomesItem, true),
+            'O desconto incondicional vem depois do valor_issrf'
+        );
+        $this->assertSame(
+            array_search('tributa_municipio_prestador', $nomesItem, true) + 1,
+            array_search('tributa_municipio_tomador', $nomesItem, true),
+            'O par de tributacao por municipio sai junto'
+        );
+
+        // §3: o proprio vai no grupo; a retencao segue nas tags antigas.
+        $this->assertSame('01', $this->value($dom, '/nfse/nf/pis_cofins/cst'));
+        $this->assertSame('1000,00', $this->value($dom, '/nfse/nf/pis_cofins/base_calculo'));
+        $this->assertSame('0,65', $this->value($dom, '/nfse/nf/pis_cofins/aliquota_pis'));
+        $this->assertSame('4,00', $this->value($dom, '/nfse/nf/pis_cofins/aliquota_cofins'));
+        $this->assertSame('15,50', $this->value($dom, '//lista/valor_desconto_incondicional'));
+    }
+
+    /**
+     * [362]: com tpOper 2 ou 3 as referencias sao obrigatorias. Recusar aqui
+     * poupa uma ida ao webservice cuja mensagem nao diz qual condicao falhou.
+     */
+    public function testTpOper2SemReferenciaEBarrado(): void
+    {
+        $rps = $this->makeRps();
+        $rps->localidadeIncidencia('4311304');
+        $rps->ibsCbs(1, 0, '100301', '011', '011004', 2);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('[362]');
+        $this->render($rps);
+    }
+
+    /**
+     * [361]: sem tpOper, ou com 1, 4 ou 5, as referencias nao podem ir.
+     */
+    public function testReferenciaSemTpOperCompativelEBarrada(): void
+    {
+        $rps = $this->makeRps();
+        $rps->localidadeIncidencia('4311304');
+        $rps->ibsCbs(1, 0, '100301', '011', '011004', 1);
+        $rps->referenciasNFSe(['43260900000000000000000000000000000000000001']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('[361]');
+        $this->render($rps);
+    }
+
+    public function testTpOper3ComReferenciasSaiSemRepeticao(): void
+    {
+        $rps = $this->makeRps();
+        $rps->localidadeIncidencia('4311304');
+        $rps->ibsCbs(1, 0, '100301', '011', '011004', 3);
+        // [363]: chave repetida e sempre erro, nunca intencao.
+        $rps->referenciasNFSe(['CHAVE-A', 'CHAVE-B', 'CHAVE-A']);
+
+        $dom = $this->load($this->render($rps));
+
+        $this->assertSame('3', $this->value($dom, '/nfse/IBSCBS/tpOper'));
+        $this->assertSame(2, $this->query($dom, '/nfse/IBSCBS/gRefNFSe/refNFSe')->length);
+    }
+
+    public function testImovelSaiComApenasOCib(): void
+    {
+        $rps = $this->makeRps();
+        $rps->localidadeIncidencia('4311304');
+        $rps->ibsCbs(1, 0, '100301', '011', '011004');
+        $rps->imovel(['cCIB' => '12345679']);
+
+        $dom = $this->load($this->render($rps));
+
+        $this->assertSame('12345679', $this->value($dom, '/nfse/IBSCBS/imovel/cCIB'));
+        $this->assertSame(0, $this->query($dom, '/nfse/IBSCBS/imovel/end')->length);
+    }
+
+    public function testImovelComEnderecoAgrupaEmEnd(): void
+    {
+        $rps = $this->makeRps();
+        $rps->localidadeIncidencia('4311304');
+        $rps->ibsCbs(1, 0, '100301', '011', '011004');
+        $rps->imovel([
+            'inscImobFisc' => '5151515151',
+            'CEP' => '89160000',
+            'xLgr' => 'Rua Um',
+            'nro' => '100',
+            'xBairro' => 'Centro',
+        ]);
+
+        $dom = $this->load($this->render($rps));
+
+        $this->assertSame('5151515151', $this->value($dom, '/nfse/IBSCBS/imovel/inscImobFisc'));
+        $this->assertSame('89160000', $this->value($dom, '/nfse/IBSCBS/imovel/end/CEP'));
+        $this->assertSame('Rua Um', $this->value($dom, '/nfse/IBSCBS/imovel/end/xLgr'));
+        $this->assertSame(0, $this->query($dom, '/nfse/IBSCBS/imovel/end/xCpl')->length);
+    }
+
+    /**
+     * O local de incidencia e IBGE (7), nao TOM (4) — o mesmo XML usa os dois
+     * padroes, e trocar rende [419]. Barrar aqui e o unico jeito de o erro
+     * aparecer com nome de campo.
+     */
+    public function testLocalidadeIncidenciaComTomEBarrada(): void
+    {
+        $rps = new Rps();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('7 digitos');
+        $rps->localidadeIncidencia('8727');
+    }
+
+    public function testFinalidadeInvalidaEBarrada(): void
+    {
+        $rps = new Rps();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('finNFSe');
+        $rps->ibsCbs(0, 0, '100301', '011', '011004');
+    }
+
+    /**
+     * [401]: as aliquotas de PIS e COFINS proprios vao de 0% a 10%.
+     */
+    public function testAliquotaDePisAcimaDeDezPorCentoEBarrada(): void
+    {
+        $rps = new Rps();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('[401]');
+        $rps->pisCofinsProprio('01', 1000.00, 12.5, 4.00);
+    }
+
+    public function testZerosAEsquerdaSaoPreservadosNaClassificacao(): void
+    {
+        $rps = $this->makeRps();
+        $rps->localidadeIncidencia('4311304');
+        // Cadastro que guarda os codigos como inteiro perde o zero a esquerda.
+        $rps->ibsCbs(1, 0, 100301, 11, 11004);
+
+        $dom = $this->load($this->render($rps));
+
+        $this->assertSame('011', $this->value($dom, '/nfse/IBSCBS/valores/trib/gIBSCBS/CST'));
+        $this->assertSame('011004', $this->value($dom, '/nfse/IBSCBS/valores/trib/gIBSCBS/cClassTrib'));
+        $this->assertSame('100301', $this->value($dom, '/nfse/IBSCBS/cIndOp'));
+    }
 }

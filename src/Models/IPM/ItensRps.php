@@ -71,6 +71,38 @@ class ItensRps
      * @var float
      */
     public $infValorIssrf;
+
+    // =========================================================================
+    // Reforma Tributária — IBS/CBS (NTE 122/2025 v1.7)
+    // =========================================================================
+
+    /**
+     * Código NBS (Nomenclatura Brasileira de Serviços), no formato
+     * 9.9999.99.99 — a tag é `Caractere`, então o ponto é parte do dado, ao
+     * contrário do subitem da LC 116.
+     * @var string|null
+     */
+    public $infCodigoNbs;
+
+    /**
+     * Desconto INCONDICIONAL do item, que entra na base do IBS/CBS:
+     * vBC = valor do serviço − desconto incondicionado − PIS/COFINS próprio.
+     *
+     * Não é o mesmo que `<valor_desconto>` de `<nf>`, que é o desconto da nota
+     * e não participa desse cálculo.
+     * @var string|null
+     */
+    public $infValorDescontoIncondicional;
+
+    /**
+     * Tributação no município do TOMADOR.
+     *
+     * Excludente de {@see $infTributaMunicipioPrestador}: o erro [389] recusa a
+     * incidência informada para os dois, e o [390] a recusa para o tomador
+     * quando não há tomador.
+     * @var string|null
+     */
+    public $infTributaMunicipioTomador;
     /**
      * Set Codigo TOM county code where service was realized Receita Federal
      * @param int $value
@@ -340,6 +372,83 @@ class ItensRps
             throw new \InvalidArgumentException($msg);
         }
         $this->infValorIssrf = $this->getValorFormatado($value);
+    }
+
+
+    // =========================================================================
+    // Reforma Tributária — IBS/CBS (NTE 122/2025 v1.7)
+    // =========================================================================
+
+    /**
+     * Codigo NBS. Obrigatorio quando o municipio exige IBS/CBS — o erro [366]
+     * cobra a tag e o [367] recusa NBS inexistente.
+     *
+     * A tag e `Caractere`, entao os pontos do formato 9.9999.99.99 ficam. Os
+     * erros [368] e [414] validam o vinculo NBS x lista de servico x indicador
+     * de operacao x classificacao tributaria, que e cadastro, nao formato.
+     *
+     * @param string $value
+     * @param string|null $campo
+     * @throws InvalidArgumentException
+     */
+    public function codigoNbs($value, $campo = null)
+    {
+        $rotulo = $campo ?: 'codigo NBS';
+        $value = trim((string) $value);
+
+        if (!Validator::stringType()->length(1, 12)->validate($value)) {
+            throw new \InvalidArgumentException(
+                "O item '$rotulo' deve ter ate 12 caracteres, no formato 9.9999.99.99. Informado: '$value'"
+            );
+        }
+
+        $this->infCodigoNbs = $value;
+    }
+
+    /**
+     * Desconto incondicional do item, que reduz a base do IBS/CBS.
+     *
+     * @param float $value
+     * @param string|null $campo
+     * @throws InvalidArgumentException
+     */
+    public function valorDescontoIncondicional($value = 0.00, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "Os valores devem ser numericos tipo float.";
+        } else {
+            $msg = "O item '$campo' deve ser numerico tipo float. Informado: '$value'";
+        }
+
+        if (!Validator::numericVal()->floatVal()->min(0)->validate($value)) {
+            throw new \InvalidArgumentException($msg);
+        }
+
+        $this->infValorDescontoIncondicional = $this->getValorFormatado($value);
+    }
+
+    /**
+     * Tributacao no municipio do tomador: 0/N ou 1/S, na mesma grafia de
+     * {@see tributaMunicipioPrestador()}.
+     *
+     * @param string|int $value
+     * @param string|null $campo
+     * @throws InvalidArgumentException
+     */
+    public function tributaMunicipioTomador($value, $campo = null)
+    {
+        if (!$campo) {
+            $msg = "Tributa municipio tomador deve ser 0/N ou 1/S.";
+        } else {
+            $msg = "O item '$campo' deve ser 0/N ou 1/S. Informado: '$value'";
+        }
+
+        $value = strtoupper(trim((string) $value));
+        if (!in_array($value, array('0', '1', 'N', 'S'), true)) {
+            throw new \InvalidArgumentException($msg);
+        }
+
+        $this->infTributaMunicipioTomador = $value;
     }
 
     private function getValorFormatado($value)
