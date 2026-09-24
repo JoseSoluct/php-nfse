@@ -310,6 +310,34 @@ class Rps extends RpsBase
      */
     public $infPTotTribSN = null;
 
+    // -------------------------------------------------------------------------
+    // IBS/CBS (Reforma Tributária) — infDPS/IBSCBS (TCRTCInfoIBSCBS)
+    // -------------------------------------------------------------------------
+
+    /** finNFSe: o XSD v1.01 só aceita "0 - NFS-e regular". */
+    const FIN_NFSE_REGULAR = '0';
+
+    /** indDest: "0 - o destinatário é o próprio tomador". */
+    const IND_DEST_TOMADOR = '0';
+
+    /**
+     * Grupo IBSCBS declarado pelo emitente — último filho de `infDPS`.
+     *
+     * A DPS leva só a CLASSIFICAÇÃO da operação: base, alíquotas e valores
+     * quem calcula é o ADN, que os devolve no `IBSCBS` de `infNFSe`.
+     *
+     * @var array{
+     *   finNFSe: string,
+     *   indFinal: ?string,
+     *   cIndOp: string,
+     *   tpOper: ?string,
+     *   indDest: string,
+     *   CST: string,
+     *   cClassTrib: string
+     * }|null
+     */
+    public $infIBSCBS = null;
+
     // =========================================================================
     // SETTERS — identificação da DPS
     // =========================================================================
@@ -822,6 +850,13 @@ class Rps extends RpsBase
         ?float $vCofins = null,
         ?int $tpRet = null
     ): void {
+        if (!preg_match('/^\d{2}$/', $cst)) {
+            throw new InvalidArgumentException("CST do PIS/COFINS deve ter 2 dígitos. Informado: '$cst'");
+        }
+        if ($tpRet !== null && ($tpRet < 0 || $tpRet > 9)) {
+            throw new InvalidArgumentException("tpRetPisCofins deve ser 0..9. Informado: '$tpRet'");
+        }
+
         $this->infPisCofins = [
             'CST'         => $cst,
             'vBC'         => $vBC !== null ? round($vBC, 2) : null,
@@ -881,5 +916,59 @@ class Rps extends RpsBase
         $this->infIndTotTrib = null;
         $this->infVTotTrib = null;
         $this->infPTotTrib = null;
+    }
+
+    /**
+     * Define o grupo IBS/CBS da DPS (infDPS/IBSCBS).
+     *
+     * O ADN exige um item da NBS (`cNBS`) na DPS sempre que este grupo é
+     * informado (E0322), e `tpOper` para compra governamental e para os
+     * subitens 25.05, 15.09, 17.12 e 10.05 da LC 116/2003 (E0903).
+     *
+     * `finNFSe` é fixo em "0" (o único valor do XSD v1.01) e `indDest` em "0":
+     * destinatário diferente do tomador exige o grupo `dest`, ainda não
+     * suportado aqui. Pelo mesmo motivo `tpOper` 2 e 3 são recusados: o ADN
+     * exige com eles o grupo `gRefNFSe` (E0905).
+     *
+     * @param string      $cIndOp     Código indicador da operação (6 dígitos)
+     * @param string      $cst        CST do IBS/CBS (3 dígitos)
+     * @param string      $cClassTrib Classificação tributária do IBS/CBS (6 dígitos)
+     * @param string|null $indFinal   Uso ou consumo pessoal (art. 57 da LC 214/2025): "0" ou "1"
+     * @param string|null $tpOper     Operação com ente governamental ou sobre bem imóvel (1, 4 ou 5)
+     */
+    public function ibsCbs(
+        string $cIndOp,
+        string $cst,
+        string $cClassTrib,
+        ?string $indFinal = null,
+        ?string $tpOper = null
+    ): void {
+        if (!preg_match('/^\d{6}$/', $cIndOp)) {
+            throw new InvalidArgumentException("cIndOp deve ter 6 dígitos. Informado: '$cIndOp'");
+        }
+        if (!preg_match('/^\d{3}$/', $cst)) {
+            throw new InvalidArgumentException("CST do IBS/CBS deve ter 3 dígitos. Informado: '$cst'");
+        }
+        if (!preg_match('/^\d{6}$/', $cClassTrib)) {
+            throw new InvalidArgumentException("cClassTrib deve ter 6 dígitos. Informado: '$cClassTrib'");
+        }
+        if ($indFinal !== null && !in_array($indFinal, ['0', '1'], true)) {
+            throw new InvalidArgumentException("indFinal deve ser 0 ou 1. Informado: '$indFinal'");
+        }
+        if ($tpOper !== null && !in_array($tpOper, ['1', '4', '5'], true)) {
+            throw new InvalidArgumentException(
+                "tpOper deve ser 1, 4 ou 5 (2 e 3 exigem NFS-e referenciada, não suportada). Informado: '$tpOper'"
+            );
+        }
+
+        $this->infIBSCBS = [
+            'finNFSe'    => self::FIN_NFSE_REGULAR,
+            'indFinal'   => $indFinal,
+            'cIndOp'     => $cIndOp,
+            'tpOper'     => $tpOper,
+            'indDest'    => self::IND_DEST_TOMADOR,
+            'CST'        => $cst,
+            'cClassTrib' => $cClassTrib,
+        ];
     }
 }

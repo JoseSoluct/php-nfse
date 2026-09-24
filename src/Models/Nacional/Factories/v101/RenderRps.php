@@ -341,6 +341,35 @@ class RenderRps
             $dom->addChild($totTrib, 'indTotTrib', (string) ($rps->infIndTotTrib ?? 0), true, 'Indicador total tributos', false);
         }
 
+        // ── IBSCBS (opcional, último filho de infDPS) ────────────────────────
+        // Ordem (TCRTCInfoIBSCBS): finNFSe → indFinal? → cIndOp → tpOper? →
+        // gRefNFSe? → tpEnteGov? → indDest → dest? → imovel? →
+        // valores{gReeRepRes?, trib{gIBSCBS{CST, cClassTrib, ...}}}
+        if (is_array($rps->infIBSCBS)) {
+            $ibsCbs = $rps->infIBSCBS;
+
+            $ibscbs = $dom->createElement('IBSCBS');
+            $dom->appChild($infDPS, $ibscbs, 'Adicionando IBSCBS');
+            $dom->addChild($ibscbs, 'finNFSe', $ibsCbs['finNFSe'], true, 'Finalidade da NFS-e', false);
+            if ($ibsCbs['indFinal'] !== null) {
+                $dom->addChild($ibscbs, 'indFinal', $ibsCbs['indFinal'], true, 'Uso ou consumo pessoal', false);
+            }
+            $dom->addChild($ibscbs, 'cIndOp', $ibsCbs['cIndOp'], true, 'Código indicador da operação', false);
+            if ($ibsCbs['tpOper'] !== null) {
+                $dom->addChild($ibscbs, 'tpOper', $ibsCbs['tpOper'], true, 'Tipo de operação', false);
+            }
+            $dom->addChild($ibscbs, 'indDest', $ibsCbs['indDest'], true, 'Destinatário do serviço', false);
+
+            $valoresIbsCbs = $dom->createElement('valores');
+            $dom->appChild($ibscbs, $valoresIbsCbs, 'Adicionando valores do IBSCBS');
+            $tribIbsCbs = $dom->createElement('trib');
+            $dom->appChild($valoresIbsCbs, $tribIbsCbs, 'Adicionando trib do IBSCBS');
+            $gIbsCbs = $dom->createElement('gIBSCBS');
+            $dom->appChild($tribIbsCbs, $gIbsCbs, 'Adicionando gIBSCBS');
+            $dom->addChild($gIbsCbs, 'CST', $ibsCbs['CST'], true, 'CST do IBS/CBS', false);
+            $dom->addChild($gIbsCbs, 'cClassTrib', $ibsCbs['cClassTrib'], true, 'Classificação tributária do IBS/CBS', false);
+        }
+
         return $dom->saveXML();
     }
 

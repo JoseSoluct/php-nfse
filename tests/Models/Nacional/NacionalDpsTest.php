@@ -116,6 +116,115 @@ final class NacionalDpsTest extends TestCase
         $this->assertStringContainsString('versao="1.01"', $xml);
     }
 
+    // ========== PIS/COFINS próprio e IBS/CBS ==========
+
+    public function testPisCofinsProprioComRetencaoValidaXsd(): void
+    {
+        $rps = $this->makeRpsBase();
+        $rps->pisCofins('01', 100.00, 0.65, 3.00, 0.65, 3.00, 8);
+        $rps->vRetCSLL(1.00);
+        $rps->gerarId();
+
+        $xml = RenderRps::render($rps);
+
+        $this->assertXsdValid($xml);
+        $this->assertStringContainsString(
+            '<piscofins><CST>01</CST><vBCPisCofins>100.00</vBCPisCofins><pAliqPis>0.65</pAliqPis>'
+            . '<pAliqCofins>3.00</pAliqCofins><vPis>0.65</vPis><vCofins>3.00</vCofins>'
+            . '<tpRetPisCofins>8</tpRetPisCofins></piscofins>',
+            $xml
+        );
+    }
+
+    public function testPisCofinsSoComCstValidaXsd(): void
+    {
+        $rps = $this->makeRpsBase();
+        $rps->pisCofins('06');
+        $rps->gerarId();
+
+        $xml = RenderRps::render($rps);
+
+        $this->assertXsdValid($xml);
+        $this->assertStringContainsString('<piscofins><CST>06</CST></piscofins>', $xml);
+    }
+
+    public function testPisCofinsRejeitaCstForaDoFormato(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        (new Rps())->pisCofins('1');
+    }
+
+    public function testPisCofinsRejeitaTipoDeRetencaoInexistente(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        (new Rps())->pisCofins('01', tpRet: 10);
+    }
+
+    public function testGrupoIbsCbsValidaXsdComoUltimoFilhoDeInfDps(): void
+    {
+        $rps = $this->makeRpsBase();
+        $rps->codigoServico('010601', 'Servico de teste prestado', '', '115022000');
+        $rps->ibsCbs('100301', '000', '000001', '0');
+        $rps->gerarId();
+
+        $xml = RenderRps::render($rps);
+
+        $this->assertXsdValid($xml);
+        $this->assertStringContainsString(
+            '</valores><IBSCBS><finNFSe>0</finNFSe><indFinal>0</indFinal><cIndOp>100301</cIndOp>'
+            . '<indDest>0</indDest><valores><trib><gIBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib>'
+            . '</gIBSCBS></trib></valores></IBSCBS></infDPS>',
+            $xml
+        );
+    }
+
+    public function testGrupoIbsCbsSemIndFinalEComTpOperValidaXsd(): void
+    {
+        $rps = $this->makeRpsBase();
+        $rps->codigoServico('010601', 'Servico de teste prestado', '', '115022000');
+        $rps->ibsCbs('100301', '200', '200001', null, '1');
+        $rps->gerarId();
+
+        $xml = RenderRps::render($rps);
+
+        $this->assertXsdValid($xml);
+        $this->assertStringNotContainsString('<indFinal>', $xml);
+        $this->assertStringContainsString('<cIndOp>100301</cIndOp><tpOper>1</tpOper><indDest>0</indDest>', $xml);
+    }
+
+    public function testSemGrupoIbsCbsONoNaoSai(): void
+    {
+        $xml = RenderRps::render($this->makeRpsBase());
+
+        $this->assertStringNotContainsString('<IBSCBS>', $xml);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string, 2: string, 3: ?string, 4: ?string}>
+     */
+    public static function ibsCbsInvalido(): array
+    {
+        return [
+            'cIndOp com 5 dígitos' => ['10030', '000', '000001', null, null],
+            'CST com 2 dígitos' => ['100301', '00', '000001', null, null],
+            'cClassTrib com letra' => ['100301', '000', '00000A', null, null],
+            'indFinal fora do domínio' => ['100301', '000', '000001', '2', null],
+            'tpOper que exige NFS-e referenciada' => ['100301', '000', '000001', null, '2'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('ibsCbsInvalido')]
+    public function testGrupoIbsCbsRejeitaCodigoForaDoFormato(
+        string $cIndOp,
+        string $cst,
+        string $cClassTrib,
+        ?string $indFinal,
+        ?string $tpOper
+    ): void {
+        $this->expectException(InvalidArgumentException::class);
+        (new Rps())->ibsCbs($cIndOp, $cst, $cClassTrib, $indFinal, $tpOper);
+    }
+
     public function testAssinaturaSha256EValidaXsd(): void
     {
         $cert = $this->loadTestCertificate();
