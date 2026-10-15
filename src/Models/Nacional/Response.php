@@ -94,23 +94,31 @@ class Response
                 $result->cStat = (int) $result->erros[0]->codigo;
             }
             if ($result->xMotivo === '') {
-                $result->xMotivo = implode(' | ', array_map(
-                    static function (stdClass $e): string {
-                        $msg = trim($e->descricao);
-                        if ($e->codigo !== '') {
-                            $msg = "[{$e->codigo}] {$msg}";
-                        }
-                        if ($e->complemento !== '') {
-                            $msg .= ' — ' . $e->complemento;
-                        }
-                        return $msg;
-                    },
-                    $result->erros
-                ));
+                $result->xMotivo = self::joinErros($result->erros);
             }
         }
 
         return $result;
+    }
+
+    /**
+     * @param array<int, stdClass> $erros lista de {codigo, descricao, complemento}
+     */
+    private static function joinErros(array $erros): string
+    {
+        return implode(' | ', array_map(
+            static function (stdClass $e): string {
+                $msg = trim($e->descricao);
+                if ($e->codigo !== '') {
+                    $msg = "[{$e->codigo}] {$msg}";
+                }
+                if ($e->complemento !== '') {
+                    $msg .= ' — ' . $e->complemento;
+                }
+                return $msg;
+            },
+            $erros
+        ));
     }
 
     /**
@@ -120,10 +128,11 @@ class Response
      *   - chaveAcesso          (string 50)
      *   - tpEvento             (string)   — ex: 110111 (cancelamento)
      *   - nSeqEvento           (int)      — número sequencial
-     *   - cStat                (int)      — status
-     *   - xMotivo              (string)
+     *   - cStat                (int|null) — status; em rejeição, o código do 1º erro se numérico
+     *   - xMotivo              (string)   — em rejeição, descrição concatenada dos erros
      *   - dhProc               (string)
-     *   - eventoXmlAssinado    (string)   — XML do evento descompactado
+     *   - eventoXmlAssinado    (string)   — XML do evento descompactado (vazio em rejeição)
+     *   - erros                (array)    — lista de {codigo, descricao, complemento} em rejeição
      *   - raw                  (stdClass)
      */
     public static function parseEvento(string $json): stdClass
@@ -143,10 +152,42 @@ class Response
         $result->nSeqEvento = isset($data->nSeqEvento) ? (int) $data->nSeqEvento : null;
         $result->cStat = isset($data->cStat) ? (int) $data->cStat : null;
         $result->xMotivo = (string) ($data->xMotivo ?? '');
-        $result->dhProc = (string) ($data->dhProc ?? '');
+        $result->dhProc = (string) ($data->dhProc ?? $data->dataHoraProcessamento ?? '');
+        $result->erros = [];
 
         if ($xml !== '') {
             self::enrichFromEventoXml($xml, $result);
+        }
+
+        // Rejeição (HTTP 4xx): o ADN manda `erros[]` (PascalCase no servidor atual,
+        // lowercase no swagger) e, em versões antigas, um `erro{}` singular.
+        $erros = [];
+        if (!empty($data->erros) && is_array($data->erros)) {
+            $erros = $data->erros;
+        } elseif (!empty($data->erro) && is_object($data->erro)) {
+            $erros = [$data->erro];
+        }
+
+        foreach ($erros as $err) {
+            if (!is_object($err)) {
+                continue;
+            }
+            $result->erros[] = (object) [
+                'codigo' => (string) ($err->codigo ?? $err->Codigo ?? ''),
+                'descricao' => (string) ($err->descricao ?? $err->Descricao ?? $err->mensagem ?? $err->Mensagem ?? ''),
+                'complemento' => (string) ($err->complemento ?? $err->Complemento ?? ''),
+            ];
+        }
+
+        if ($result->erros !== []) {
+            // Códigos do ADN são alfanuméricos (E0840): cStat só quando for número.
+            $firstCode = $result->erros[0]->codigo;
+            if ($result->cStat === null && ctype_digit($firstCode)) {
+                $result->cStat = (int) $firstCode;
+            }
+            if ($result->xMotivo === '') {
+                $result->xMotivo = self::joinErros($result->erros);
+            }
         }
 
         return $result;
