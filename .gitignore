@@ -2,3 +2,4 @@
 /vendor
 /tests/fixtures/certs
 .env
+.phpunit.result.cache
